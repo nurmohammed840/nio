@@ -1,0 +1,8 @@
+[package]
+name = "mpmc-channel"
+version = "0.0.0"
+description = "simple mutex based MPMC channel"
+license = "MIT"
+edition = "2021"
+
+[dependencies]

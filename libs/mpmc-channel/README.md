@@ -1,0 +1,1 @@
+Simple Mutex based MPMC (Multi-Producer Multi-Consumer) channel
