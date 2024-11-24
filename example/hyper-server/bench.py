@@ -72,7 +72,7 @@ if __name__ == "__main__":
     print("Running benchmarks for NIO server...")
     nio_results = run_wrk(NIO_URL, args.duration, THREADS, CONNECTIONS)
 
-    print("Running benchmarks for Nio server...")
+    print("Running benchmarks for Tokio server...")
     tokio_results = run_wrk(TOKIO_URL, args.duration, THREADS, CONNECTIONS)
 
     print("Generating combined graphs...")

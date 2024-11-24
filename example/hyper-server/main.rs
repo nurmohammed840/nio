@@ -38,7 +38,11 @@ async fn hello(_: Request<hyper::body::Incoming>) -> Result<Response<Full<Bytes>
 }
 
 #[nio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+async fn main() {
+    let _ = nio::spawn(run()).await;
+}
+
+async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     #[cfg(feature = "tokio")]
     let addr = SocketAddr::from(([127, 0, 0, 1], 5000));
     #[cfg(not(feature = "tokio"))]
