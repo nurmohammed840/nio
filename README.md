@@ -7,7 +7,14 @@ You'll still need to rely on libraries like `tokio` for everything else.
 
 ## Example
 
-Here is a basic example:
+Add the following dependency to your `Cargo.toml`:
+
+```toml
+[dependencies]
+nio = "0.0.1"
+```
+
+Here is a basic echo server example:
 
 ```rust
 use nio::net::TcpListener;

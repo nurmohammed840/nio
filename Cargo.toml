@@ -1,14 +1,13 @@
 [workspace]
 resolver = "2"
-members = [
-    "libs/*",
-    "benchmarks",
-    "example",
-    "macros"
-]
+members = ["libs/*", "benchmarks", "example", "macros"]
 
 [package]
 name = "nio"
+description = """
+An experimental async runtime for Rust
+"""
+license = "MIT"
 version = "0.0.1"
 edition = "2021"
 
@@ -20,8 +19,8 @@ socket2 = "0.5"
 mio = { version = "1", features = ["os-poll", "net"] }
 tokio = { version = "1", features = ["full"] }
 
-mpmc-channel = { path = "libs/mpmc-channel" }
-nio-macros = { path = "./macros" }
+mpmc-channel = { path = "libs/mpmc-channel", version = "0.0.0" }
+nio-macros = { path = "./macros", version = "0.1.0" }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
@@ -44,10 +43,9 @@ pin-project-lite = "0.2"
 
 [target.'cfg(windows)'.dev-dependencies.windows-sys]
 version = "0.52"
-features = [
-  "Win32_Foundation",
-  "Win32_Security_Authorization",
-]
+features = ["Win32_Foundation", "Win32_Security_Authorization"]
 
 [lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ["cfg(mio_unsupported_force_poll_poll)"] }
+unexpected_cfgs = { level = "warn", check-cfg = [
+  "cfg(mio_unsupported_force_poll_poll)",
+] }
