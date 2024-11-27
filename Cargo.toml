@@ -17,7 +17,7 @@ futures = "0.3"
 
 socket2 = "0.5"
 mio = { version = "1", features = ["os-poll", "net"] }
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1" }
 
 mpmc-channel = { path = "libs/mpmc-channel", version = "0.0.0" }
 nio-macros = { path = "./macros", version = "0.1.0" }

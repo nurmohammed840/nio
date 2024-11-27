@@ -1,6 +1,7 @@
 ## Nio
 
 Nio is an experimental async runtime for Rust.
+For more information, check out [this article](https://nurmohammed840.github.io/posts/announcing-nio/)
 
 Nio focuses solely on providing an async runtime, It doesn't include additional utilities like. `io`, `sync`,
 You'll still need to rely on libraries like `tokio` for everything else.
@@ -33,7 +34,8 @@ async fn main() -> io::Result<()> {
         nio::spawn(async move {
             let mut buf = vec![0; 1024];
             while let Ok(n) = stream.read(&mut buf).await {
-                stream.write(&buf[..n]).await.unwrap();
+                if n == 0 { break }
+                stream.write_all(&buf[..n]).await.unwrap();
             }
         });
     }
