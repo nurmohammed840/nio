@@ -194,7 +194,7 @@ async fn test_abort_task_that_panics_on_drop_returned() {
     });
 
     // wait for task to sleep.
-    time::sleep(Duration::from_millis(100)).await;
+    time::sleep(Duration::from_secs(1)).await;
 
     handle.abort();
     assert!(handle.await.unwrap_err().is_panic());

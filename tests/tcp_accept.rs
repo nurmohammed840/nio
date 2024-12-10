@@ -49,6 +49,7 @@ use std::sync::{
     Arc,
 };
 use std::task::{Context, Poll};
+use std::time::Duration;
 use tokio_stream::{Stream, StreamExt};
 
 struct TrackPolls<'a> {
@@ -86,6 +87,7 @@ async fn no_extra_poll() {
 
     let npolls = assert_ok!(rx.await);
     nio::task::yield_now().await;
+    nio::time::sleep(Duration::from_secs(1)).await;
 
     // should have been polled exactly once: the initial poll
     assert_eq!(npolls.load(SeqCst), 1);
