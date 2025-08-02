@@ -43,7 +43,7 @@ impl<T> MPMC<T> {
     }
 
     #[inline]
-    pub fn produce(&self) -> Producer<T> {
+    pub fn produce(&self) -> Producer<'_, T> {
         let guard = self.inner.lock().unwrap();
         Producer {
             cvar: &self.cvar,
@@ -52,7 +52,7 @@ impl<T> MPMC<T> {
     }
 
     #[inline]
-    pub fn consume(&self) -> Consume<T> {
+    pub fn consume(&self) -> Consume<'_, T> {
         let guard = self.inner.lock().unwrap();
         Consume {
             cvar: &self.cvar,
@@ -60,7 +60,7 @@ impl<T> MPMC<T> {
         }
     }
 
-    pub fn try_produce(&self) -> Result<Producer<T>, WouldBlock> {
+    pub fn try_produce(&self) -> Result<Producer<'_, T>, WouldBlock> {
         let guard = match self.inner.try_lock() {
             Ok(val) => val,
             Err(TryLockError::WouldBlock) => return Err(WouldBlock),
@@ -72,7 +72,7 @@ impl<T> MPMC<T> {
         })
     }
 
-    pub fn try_consume(&self) -> Result<Consume<T>, WouldBlock> {
+    pub fn try_consume(&self) -> Result<Consume<'_, T>, WouldBlock> {
         let guard = match self.inner.try_lock() {
             Ok(val) => val,
             Err(TryLockError::WouldBlock) => return Err(WouldBlock),
