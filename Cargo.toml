@@ -15,7 +15,7 @@ edition = "2021"
 crossbeam-channel = "0.5"
 futures = "0.3"
 
-socket2 = "0.5"
+socket2 = { version = "0.5", features = ["all"] }
 mio = { version = "1", features = ["os-poll", "net"] }
 tokio = { version = "1" }
 
