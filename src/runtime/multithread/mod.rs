@@ -70,7 +70,7 @@ impl Runtime {
         &self.handle
     }
 
-    pub fn enter(&self) -> EnterGuard {
+    pub fn enter(&self) -> EnterGuard<'_> {
         self.handle.ctx.clone().init();
         EnterGuard::new()
     }

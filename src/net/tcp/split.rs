@@ -21,7 +21,7 @@ pub struct WriteHalf<'a> {
     me: &'a TcpStream,
 }
 
-pub fn split(stream: &mut TcpStream) -> (ReadHalf, WriteHalf) {
+pub fn split(stream: &mut TcpStream) -> (ReadHalf<'_>, WriteHalf<'_>) {
     (ReadHalf { me: stream }, WriteHalf { me: stream })
 }
 

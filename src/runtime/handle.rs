@@ -55,7 +55,7 @@ impl Handle {
         crate::future::block_on(fut)
     }
 
-    pub fn enter(&self) -> EnterGuard {
+    pub fn enter(&self) -> EnterGuard<'_> {
         self.ctx.clone().init();
         EnterGuard::new()
     }

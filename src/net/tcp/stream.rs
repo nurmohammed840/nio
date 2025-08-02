@@ -135,7 +135,7 @@ impl TcpStream {
         self.io.set_ttl(ttl)
     }
 
-    pub fn split(&mut self) -> (ReadHalf, WriteHalf) {
+    pub fn split(&mut self) -> (ReadHalf<'_>, WriteHalf<'_>) {
         split(self)
     }
 
