@@ -93,12 +93,12 @@ impl Default for ScheduledIo {
 impl ScheduledIo {
     #[inline]
     pub fn into_token(self: &Arc<Self>) -> usize {
-        Arc::as_ptr(self) as usize
+        Arc::as_ptr(self).expose_provenance()
     }
 
     #[inline]
     pub fn from_token(token: usize) -> *const ScheduledIo {
-        token as *const ScheduledIo
+        std::ptr::with_exposed_provenance(token)
     }
 
     /// Polls for readiness events in a given direction.
