@@ -6,7 +6,7 @@ use crate::io::ready::Ready;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{AcqRel, Acquire};
 use std::sync::Arc;
-use std::task::{Context, Poll};
+use std::task::Poll;
 
 use super::utils::bit;
 
@@ -54,8 +54,8 @@ pub struct ScheduledIo {
     /// Packs the resource's readiness and I/O driver latest tick.
     readiness: AtomicUsize,
     /// Waker used for `AsyncRead`.
-    reader: AtomicWaker,
-    writer: AtomicWaker,
+    pub reader: AtomicWaker,
+    pub writer: AtomicWaker,
 }
 
 #[derive(Debug)]
@@ -106,7 +106,7 @@ impl ScheduledIo {
     /// These are to support `AsyncRead` and `AsyncWrite` polling methods,
     /// which cannot use the `async fn` version. This uses reserved reader
     /// and writer slots.
-    pub fn poll_readiness(&self, cx: &mut Context<'_>, interest: Interest) -> Poll<ReadyEvent> {
+    pub fn poll_readiness(&self, interest: Interest) -> Poll<ReadyEvent> {
         let curr = self.readiness.load(Acquire);
         let ready = Ready::from_usize(curr).intersection(interest);
 
@@ -116,12 +116,7 @@ impl ScheduledIo {
                 ready,
             });
         }
-        if interest == Interest::READABLE {
-            self.reader.register(cx.waker());
-        } else {
-            debug_assert_eq!(interest, Interest::WRITABLE);
-            self.writer.register(cx.waker());
-        };
+
         Poll::Pending
     }
 

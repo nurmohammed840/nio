@@ -69,13 +69,22 @@ impl<E: Source> PollEvented<E> {
     {
         let io = self.deref();
         let registration = &self.registration;
-        poll_fn(move |cx| loop {
-            let event = ready!(registration.scheduled_io.poll_readiness(cx, interest));
-            match f(io) {
-                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                    registration.scheduled_io.clear_readiness(event);
+        
+        poll_fn(move |cx| {
+            if interest == Interest::READABLE {
+                registration.scheduled_io.reader.register(cx.waker());
+            } else {
+                debug_assert_eq!(interest, Interest::WRITABLE);
+                registration.scheduled_io.writer.register(cx.waker());
+            };
+            loop {
+                let event = ready!(registration.scheduled_io.poll_readiness(interest));
+                match f(io) {
+                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                        registration.scheduled_io.clear_readiness(event);
+                    }
+                    res => return Poll::Ready(res),
                 }
-                res => return Poll::Ready(res),
             }
         })
     }
@@ -104,7 +113,15 @@ impl<E: Source> PollEvented<E> {
         map: fn(ReadyEvent) -> T,
     ) -> PollFn<impl FnMut(&mut Context) -> Poll<T> + use<'_, E, T>> {
         let scheduled_io = &self.registration.scheduled_io;
-        poll_fn(move |cx| scheduled_io.poll_readiness(cx, interest).map(map))
+        poll_fn(move |cx| {
+            if interest == Interest::READABLE {
+                scheduled_io.reader.register(cx.waker());
+            } else {
+                debug_assert_eq!(interest, Interest::WRITABLE);
+                scheduled_io.writer.register(cx.waker());
+            };
+            scheduled_io.poll_readiness(interest).map(map)
+        })
     }
 }
 
@@ -116,11 +133,13 @@ impl<E: Source> PollEvented<E> {
     {
         use std::io::Read;
 
+        self.registration.scheduled_io.reader.register(cx.waker());
+
         loop {
             let event = ready!(self
                 .registration
                 .scheduled_io
-                .poll_readiness(cx, Interest::READABLE));
+                .poll_readiness(Interest::READABLE));
 
             // used only when the cfgs below apply
             #[allow(unused_variables)]
@@ -175,11 +194,14 @@ impl<E: Source> PollEvented<E> {
     {
         use std::io::Write;
 
+        self.registration.scheduled_io.writer.register(cx.waker());
+
         loop {
             let event = ready!(self
                 .registration
                 .scheduled_io
-                .poll_readiness(cx, Interest::WRITABLE));
+                .poll_readiness(Interest::WRITABLE));
+
             match self.deref().write(buf) {
                 Ok(n) => {
                     // if we write only part of our buffer, this is sufficient on unix to show
@@ -211,11 +233,14 @@ impl<E: Source> PollEvented<E> {
         &'a E: io::Write + 'a,
     {
         use std::io::Write;
+
+        self.registration.scheduled_io.writer.register(cx.waker());
+
         loop {
             let event = ready!(self
                 .registration
                 .scheduled_io
-                .poll_readiness(cx, Interest::WRITABLE));
+                .poll_readiness(Interest::WRITABLE));
 
             match self.deref().write_vectored(bufs) {
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
