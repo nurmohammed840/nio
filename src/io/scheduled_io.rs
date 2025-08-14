@@ -80,7 +80,7 @@ mod readiness {
     pub const WRITE_CLOSED: u16 = 0b_10;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Readiness(usize);
 
 impl Readiness {
@@ -180,20 +180,22 @@ impl ScheduledIo {
         }
     }
 
-    pub fn clear_read_readiness(&self, old: Readiness) {
+    pub fn clear_read_readiness(&self, old: Readiness) -> Option<Readiness> {
         let new = old.0 & !(readiness::READABLE as usize);
-        let _ = self
-            .read_event
+        self.read_event
             .readiness
-            .compare_exchange(old.0, new, AcqRel, Acquire);
+            .compare_exchange(old.0, new, AcqRel, Acquire)
+            .err()
+            .map(Readiness)
     }
 
-    pub fn clear_write_readiness(&self, old: Readiness) {
+    pub fn clear_write_readiness(&self, old: Readiness) -> Option<Readiness> {
         let new = old.0 & !(readiness::WRITABLE as usize);
-        let _ = self
-            .write_event
+        self.write_event
             .readiness
-            .compare_exchange(old.0, new, AcqRel, Acquire);
+            .compare_exchange(old.0, new, AcqRel, Acquire)
+            .err()
+            .map(Readiness)
     }
 
     pub fn drop_wakers(&self) {

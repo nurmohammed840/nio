@@ -69,14 +69,18 @@ impl<E: Source> PollEvented<E> {
         poll_fn(move |cx| {
             scheduled_io.read_event.waker.register(cx.waker());
 
+            let mut readiness = scheduled_io.read_readiness();
+            if readiness.is_empty() {
+                return Poll::Pending;
+            }
+
             loop {
-                let readiness = scheduled_io.read_readiness();
-                if readiness.is_empty() {
-                    return Poll::Pending;
-                }
                 match f(io) {
                     Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
-                        scheduled_io.clear_read_readiness(readiness)
+                        match scheduled_io.clear_read_readiness(readiness) {
+                            Some(new) => readiness = new,
+                            None => return Poll::Pending,
+                        }
                     }
                     res => return Poll::Ready(res),
                 }
@@ -97,15 +101,18 @@ impl<E: Source> PollEvented<E> {
         poll_fn(move |cx| {
             scheduled_io.write_event.waker.register(cx.waker());
 
-            loop {
-                let readiness = scheduled_io.write_readiness();
-                if readiness.is_empty() {
-                    return Poll::Pending;
-                }
+            let mut readiness = scheduled_io.write_readiness();
+            if readiness.is_empty() {
+                return Poll::Pending;
+            }
 
+            loop {
                 match f(io) {
                     Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
-                        scheduled_io.clear_write_readiness(readiness);
+                        match scheduled_io.clear_write_readiness(readiness) {
+                            Some(new) => readiness = new,
+                            None => return Poll::Pending,
+                        }
                     }
                     res => return Poll::Ready(res),
                 }
@@ -125,7 +132,8 @@ impl<E: Source> PollEvented<E> {
 
         match f(self.deref()) {
             Err(e) if e.kind() == ErrorKind::WouldBlock => {
-                self.registration
+                let _ = self
+                    .registration
                     .scheduled_io
                     .clear_read_readiness(readiness);
 
@@ -147,7 +155,8 @@ impl<E: Source> PollEvented<E> {
 
         match f(self.deref()) {
             Err(e) if e.kind() == ErrorKind::WouldBlock => {
-                self.registration
+                let _ = self
+                    .registration
                     .scheduled_io
                     .clear_write_readiness(readiness);
 
@@ -201,12 +210,12 @@ impl<E: Source> PollEvented<E> {
         let scheduled_io = &self.registration.scheduled_io;
         scheduled_io.read_event.waker.register(cx.waker());
 
-        loop {
-            let readiness = scheduled_io.read_readiness();
-            if readiness.is_empty() {
-                return Poll::Pending;
-            }
+        let mut readiness = scheduled_io.read_readiness();
+        if readiness.is_empty() {
+            return Poll::Pending;
+        }
 
+        loop {
             // used only when the cfgs below apply
             #[allow(unused_variables)]
             let len = buf.len();
@@ -242,12 +251,15 @@ impl<E: Source> PollEvented<E> {
                         )
                     ))]
                     if 0 < n && n < len {
-                        scheduled_io.clear_read_readiness(readiness);
+                        let _ = scheduled_io.clear_read_readiness(readiness);
                     }
                     return Poll::Ready(Ok(n));
                 }
                 Err(e) if e.kind() == ErrorKind::WouldBlock => {
-                    scheduled_io.clear_read_readiness(readiness);
+                    match scheduled_io.clear_read_readiness(readiness) {
+                        Some(new) => readiness = new,
+                        None => return Poll::Pending,
+                    }
                 }
                 Err(e) => return Poll::Ready(Err(e)),
             }
@@ -263,12 +275,12 @@ impl<E: Source> PollEvented<E> {
         let scheduled_io = &self.registration.scheduled_io;
         scheduled_io.write_event.waker.register(cx.waker());
 
-        loop {
-            let readiness = scheduled_io.write_readiness();
-            if readiness.is_empty() {
-                return Poll::Pending;
-            }
+        let mut readiness = scheduled_io.write_readiness();
+        if readiness.is_empty() {
+            return Poll::Pending;
+        }
 
+        loop {
             match self.deref().write(buf) {
                 Ok(n) => {
                     // if we write only part of our buffer, this is sufficient on unix to show
@@ -279,12 +291,15 @@ impl<E: Source> PollEvented<E> {
                         && n < buf.len()
                         && (!cfg!(windows) && !cfg!(mio_unsupported_force_poll_poll))
                     {
-                        scheduled_io.clear_write_readiness(readiness);
+                        let _ = scheduled_io.clear_write_readiness(readiness);
                     }
                     return Poll::Ready(Ok(n));
                 }
                 Err(e) if e.kind() == ErrorKind::WouldBlock => {
-                    scheduled_io.clear_write_readiness(readiness);
+                    match scheduled_io.clear_write_readiness(readiness) {
+                        Some(new) => readiness = new,
+                        None => return Poll::Pending,
+                    }
                 }
                 Err(e) => return Poll::Ready(Err(e)),
             }
@@ -303,15 +318,18 @@ impl<E: Source> PollEvented<E> {
         let scheduled_io = &self.registration.scheduled_io;
         scheduled_io.write_event.waker.register(cx.waker());
 
-        loop {
-            let readiness = scheduled_io.write_readiness();
-            if readiness.is_empty() {
-                return Poll::Pending;
-            }
+        let mut readiness = scheduled_io.write_readiness();
+        if readiness.is_empty() {
+            return Poll::Pending;
+        }
 
+        loop {
             match self.deref().write_vectored(bufs) {
                 Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
-                    scheduled_io.clear_write_readiness(readiness);
+                    match scheduled_io.clear_write_readiness(readiness) {
+                        Some(new) => readiness = new,
+                        None => return Poll::Pending,
+                    }
                 }
                 res => return Poll::Ready(res),
             }
