@@ -65,7 +65,7 @@ impl Event {
         let _ = self.readiness.fetch_update(AcqRel, Acquire, |state| {
             let mut state = ReadinessVersion::from_usize(state);
             state.version = state.version.wrapping_add(1);
-            state.readiness = state.readiness | readiness;
+            state.readiness |= readiness;
             Some(state.into_usize())
         });
         self.waker.wake();

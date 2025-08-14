@@ -6,7 +6,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 async fn main() -> io::Result<()> {
     let listener = TcpListener::bind("127.0.0.1:8080").await?;
     println!("{listener:#?}");
-    
+
     loop {
         let (mut stream, addr) = listener.accept().await?;
         println!("[INCOMING] {addr:?}");

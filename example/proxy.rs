@@ -22,8 +22,8 @@
 
 #![warn(rust_2018_idioms)]
 
-use tokio::io::copy_bidirectional;
 use nio::net::{TcpListener, TcpStream};
+use tokio::io::copy_bidirectional;
 
 use futures::FutureExt;
 use std::env;

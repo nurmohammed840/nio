@@ -36,7 +36,7 @@ impl PartialEq for Timer {
 }
 impl PartialOrd for Timer {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(other.deadline.cmp(&self.deadline))
+        Some(self.cmp(other))
     }
 }
 impl Ord for Timer {

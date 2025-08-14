@@ -157,13 +157,10 @@ impl fmt::Debug for JoinError {
 
 impl From<JoinError> for io::Error {
     fn from(src: JoinError) -> io::Error {
-        io::Error::new(
-            io::ErrorKind::Other,
-            match src.repr {
-                Repr::Cancelled => "task was cancelled",
-                Repr::Panic(_) => "task panicked",
-            },
-        )
+        io::Error::other(match src.repr {
+            Repr::Cancelled => "task was cancelled",
+            Repr::Panic(_) => "task panicked",
+        })
     }
 }
 

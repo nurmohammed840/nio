@@ -44,10 +44,6 @@ name = "chat"
 path = "chat.rs"
 
 [[example]]
-name = "connect"
-path = "connect.rs"
-
-[[example]]
 name = "echo-udp"
 path = "echo-udp.rs"
 
@@ -76,32 +72,8 @@ name = "udp-client"
 path = "udp-client.rs"
 
 [[example]]
-name = "udp-codec"
-path = "udp-codec.rs"
-
-[[example]]
 name = "tinyhttp"
 path = "tinyhttp.rs"
-
-[[example]]
-name = "custom-executor"
-path = "custom-executor.rs"
-
-[[example]]
-name = "custom-executor-tokio-context"
-path = "custom-executor-tokio-context.rs"
-
-[[example]]
-name = "named-pipe"
-path = "named-pipe.rs"
-
-[[example]]
-name = "named-pipe-ready"
-path = "named-pipe-ready.rs"
-
-[[example]]
-name = "named-pipe-multi-client"
-path = "named-pipe-multi-client.rs"
 
 [[example]]
 name = "hyper-server"
