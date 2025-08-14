@@ -1,5 +1,5 @@
 use crate::{
-    io::{poll_evented::PollEvented, Interest},
+    io::poll_evented::PollEvented,
     net::{utils::bind, TcpStream},
 };
 use std::{
@@ -28,7 +28,7 @@ impl TcpListener {
     }
 
     pub fn accept(&self) -> impl Future<Output = Result<(TcpStream, SocketAddr)>> + '_ {
-        self.io.async_io(Interest::READABLE, |io| {
+        self.io.async_io_read(|io| {
             let (mio, addr) = io.accept()?;
             Ok((TcpStream::new(mio)?, addr))
         })

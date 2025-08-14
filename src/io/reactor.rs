@@ -5,8 +5,7 @@ use std::sync::{Arc, Mutex};
 use mio::event::Source;
 
 use super::driver::Events;
-use super::scheduled_io::{ScheduledIo, Tick};
-use super::{Interest, Ready};
+use super::scheduled_io::ScheduledIo;
 use crate::time::timer::Timers;
 
 pub struct Reactor {
@@ -71,26 +70,26 @@ impl Reactor {
         let events = match self.events.poll(timeout) {
             Ok(events) => events,
             Err(ref e) if e.kind() == io::ErrorKind::Interrupted => return,
+            #[cfg(target_os = "wasi")]
+            Err(e) if e.kind() == io::ErrorKind::InvalidInput => {
+                // In case of wasm32_wasi this error happens, when trying to poll without subscriptions
+                // just return from the park, as there would be nothing, which wakes us up.
+                return;
+            }
             Err(e) => panic!("unexpected error when polling the I/O driver: {e:?}"),
         };
 
-        for event in events {
-            if Events::is_wake(event) {
+        for ev in events {
+            if Events::has_woken(ev) {
                 continue;
             }
-
-            let ready = Ready::from_mio(event);
-
-            let token = event.token();
-            let ptr = ScheduledIo::from_token(token.0);
-
+            let ptr = ScheduledIo::from_token(ev.token().0);
             // Safety: we ensure that the pointers used as tokens are not freed
             // until they are both deregistered from mio **and** we know the I/O
             // driver is not concurrently polling. The I/O driver holds ownership of
             // an `Arc<ScheduledIo>` so we can safely cast this to a ref.
             let io: &ScheduledIo = unsafe { &*ptr };
-            io.set_readiness(Tick::Set, |curr| curr | ready);
-            io.wake(ready);
+            io.notify_event(ev);
         }
 
         self.shared.timers.lock().unwrap().process();
@@ -116,13 +115,13 @@ impl ReactorContext {
         self.waker.wake().expect("failed to wake I/O driver");
     }
 
-    pub fn register<S>(&self, io: &mut S, interest: Interest) -> Result<Arc<ScheduledIo>>
+    pub fn register<S>(&self, io: &mut S, interest: mio::Interest) -> Result<Arc<ScheduledIo>>
     where
         S: Source,
     {
         let scheduled_io = Arc::new(ScheduledIo::default());
         let token = mio::Token(scheduled_io.into_token());
-        self.registry.register(io, token, interest.to_mio())?;
+        self.registry.register(io, token, interest)?;
         Ok(scheduled_io)
     }
 

@@ -1,5 +1,7 @@
+use futures::FutureExt;
+
 use super::utils::bind;
-use crate::io::{poll_evented::PollEvented, Interest, Ready};
+use crate::io::poll_evented::PollEvented;
 use std::{
     fmt,
     future::{self, Future},
@@ -43,32 +45,28 @@ impl UdpSocket {
         future::ready(bind(addr, |addr| io.connect(addr)))
     }
 
-    pub fn ready(&self, interest: Interest) -> impl Future<Output = Result<Ready>> + '_ {
-        self.io.readiness(interest, |ev| Ok(ev.ready))
-    }
-
-    pub fn writable(&self) -> impl Future<Output = Result<Ready>> + '_ {
-        self.ready(Interest::WRITABLE)
+    pub fn writable(&self) -> impl Future<Output = Result<()>> + '_ {
+        self.io.poll_write_readiness().map(|_| Ok(()))
     }
 
     pub fn send<'b>(&self, buf: &'b [u8]) -> impl Future<Output = Result<usize>> + use<'_, 'b> {
-        self.io.async_io(Interest::WRITABLE, |io| io.send(buf))
+        self.io.async_io_write(|io| io.send(buf))
     }
 
     pub fn try_send(&self, buf: &[u8]) -> Result<usize> {
-        self.io.try_io(Interest::WRITABLE, |io| io.send(buf))
+        self.io.try_io_write(|io| io.send(buf))
     }
 
     pub fn readable(&self) -> impl Future<Output = Result<()>> + '_ {
-        self.io.readiness(Interest::READABLE, |_| Ok(()))
+        self.io.poll_read_readiness().map(|_| Ok(()))
     }
 
     pub fn recv<'b>(&self, buf: &'b mut [u8]) -> impl Future<Output = Result<usize>> + use<'_, 'b> {
-        self.io.async_io(Interest::READABLE, |io| io.recv(buf))
+        self.io.async_io_read(|io| io.recv(buf))
     }
 
     pub fn try_recv(&self, buf: &mut [u8]) -> Result<usize> {
-        self.io.try_io(Interest::READABLE, |io| io.recv(buf))
+        self.io.try_io_read(|io| io.recv(buf))
     }
 
     pub fn send_to<'b>(
@@ -76,53 +74,33 @@ impl UdpSocket {
         buf: &'b [u8],
         target: SocketAddr,
     ) -> impl Future<Output = Result<usize>> + use<'_, 'b> {
-        self.io
-            .async_io(Interest::WRITABLE, move |io| io.send_to(buf, target))
+        self.io.async_io_write(move |io| io.send_to(buf, target))
     }
 
     pub fn try_send_to(&self, buf: &[u8], target: SocketAddr) -> Result<usize> {
-        self.io
-            .try_io(Interest::WRITABLE, |io| io.send_to(buf, target))
+        self.io.try_io_write(|io| io.send_to(buf, target))
     }
 
     pub fn recv_from<'b>(
         &self,
         buf: &'b mut [u8],
     ) -> impl Future<Output = Result<(usize, SocketAddr)>> + use<'_, 'b> {
-        self.io.async_io(Interest::READABLE, |io| io.recv_from(buf))
+        self.io.async_io_read(|io| io.recv_from(buf))
     }
 
     pub fn try_recv_from(&self, buf: &mut [u8]) -> Result<(usize, SocketAddr)> {
-        self.io.try_io(Interest::READABLE, |io| io.recv_from(buf))
-    }
-
-    pub fn try_io<F, T>(&self, interest: Interest, f: F) -> Result<T>
-    where
-        F: FnOnce() -> Result<T>,
-    {
-        self.io.try_io(interest, |io| io.try_io(f))
-    }
-
-    pub fn async_io<F, T>(
-        &self,
-        interest: Interest,
-        mut f: F,
-    ) -> impl Future<Output = Result<T>> + use<'_, F, T>
-    where
-        F: FnMut() -> Result<T>,
-    {
-        self.io.async_io(interest, move |io| io.try_io(&mut f))
+        self.io.try_io_read(|io| io.recv_from(buf))
     }
 
     pub fn peek_from<'b>(
         &self,
         buf: &'b mut [u8],
     ) -> impl Future<Output = Result<(usize, SocketAddr)>> + use<'_, 'b> {
-        self.io.async_io(Interest::READABLE, |io| io.peek_from(buf))
+        self.io.async_io_read(|io| io.peek_from(buf))
     }
 
     pub fn try_peek_from(&self, buf: &mut [u8]) -> Result<(usize, SocketAddr)> {
-        self.io.try_io(Interest::READABLE, |io| io.peek_from(buf))
+        self.io.try_io_read(|io| io.peek_from(buf))
     }
 
     pub fn broadcast(&self) -> Result<bool> {

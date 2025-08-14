@@ -1,20 +1,16 @@
 use futures::task::AtomicWaker;
 
-use crate::io::interest::Interest;
-use crate::io::ready::Ready;
-
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{AcqRel, Acquire};
 use std::sync::Arc;
-use std::task::{Context, Poll};
 
-use super::utils::bit;
-
-// # This struct should be cache padded to avoid false sharing. The cache padding rules are copied
+// # This struct should be cache padded to avoid false sharing.
+// see: https://docs.rs/crossbeam/latest/crossbeam/utils/struct.CachePadded.html
 #[cfg_attr(
     any(
         target_arch = "x86_64",
         target_arch = "aarch64",
+        target_arch = "arm64ec",
         target_arch = "powerpc64",
     ),
     repr(align(128))
@@ -37,6 +33,7 @@ use super::utils::bit;
     not(any(
         target_arch = "x86_64",
         target_arch = "aarch64",
+        target_arch = "arm64ec",
         target_arch = "powerpc64",
         target_arch = "arm",
         target_arch = "mips",
@@ -50,43 +47,76 @@ use super::utils::bit;
     )),
     repr(align(64))
 )]
+#[derive(Default)]
 pub struct ScheduledIo {
     /// Packs the resource's readiness and I/O driver latest tick.
+    pub read_event: Event,
+    pub write_event: Event,
+}
+
+#[derive(Default)]
+pub struct Event {
     readiness: AtomicUsize,
-    /// Waker used for `AsyncRead`.
-    reader: AtomicWaker,
-    writer: AtomicWaker,
+    pub waker: AtomicWaker,
+}
+
+impl Event {
+    fn update_readiness_and_notify(&self, readiness: u16) {
+        let _ = self.readiness.fetch_update(AcqRel, Acquire, |state| {
+            let mut state = ReadinessVersion::from_usize(state);
+            state.version = state.version.wrapping_add(1);
+            state.readiness = state.readiness | readiness;
+            Some(state.into_usize())
+        });
+        self.waker.wake();
+    }
+}
+
+mod readiness {
+    pub const READABLE: u16 = 0b_01;
+    pub const WRITABLE: u16 = 0b_01;
+
+    pub const READ_CLOSED: u16 = 0b_10;
+    pub const WRITE_CLOSED: u16 = 0b_10;
 }
 
 #[derive(Debug)]
-pub struct ReadyEvent {
-    pub ready: Ready,
-    tick: u8,
+pub struct Readiness(usize);
+
+impl Readiness {
+    pub fn is_empty(&self) -> bool {
+        (self.0 & 0xFFFF) == 0
+    }
+
+    pub fn is_read_closed(&self) -> bool {
+        self.0 & (readiness::READ_CLOSED as usize) == (readiness::READ_CLOSED as usize)
+    }
+
+    pub fn is_write_closed(&self) -> bool {
+        self.0 & (readiness::WRITE_CLOSED as usize) == (readiness::WRITE_CLOSED as usize)
+    }
 }
 
-pub enum Tick {
-    Set,
-    Clear(u8),
+// |  version  | readiness |
+// |-----------+-----------|
+// |  16 bits  +  16 bits  |
+struct ReadinessVersion {
+    version: u16,
+    readiness: u16,
 }
 
-// The `ScheduledIo::readiness` (`AtomicUsize`) is packed full of goodness.
-//
-// | driver tick | readiness |
-// |-------------+-----------|
-// |  15 bits    +   16 bits |
-
-const READINESS: bit::Pack = bit::Pack::least_significant(16);
-const TICK: bit::Pack = READINESS.then(15);
-
-// ===== impl ScheduledIo =====
-
-impl Default for ScheduledIo {
-    fn default() -> ScheduledIo {
-        ScheduledIo {
-            readiness: AtomicUsize::new(0),
-            reader: AtomicWaker::new(),
-            writer: AtomicWaker::new(),
+impl ReadinessVersion {
+    pub fn from_usize(state: usize) -> Self {
+        Self {
+            version: ((state >> 16) & 0xFFFF) as u16,
+            readiness: (state & 0xFFFF) as u16,
         }
+    }
+
+    fn into_usize(self) -> usize {
+        let version = (self.version as usize) << 16;
+        let readiness = self.readiness as usize;
+        version | readiness
     }
 }
 
@@ -101,94 +131,80 @@ impl ScheduledIo {
         std::ptr::with_exposed_provenance(token)
     }
 
-    /// Polls for readiness events in a given direction.
-    ///
-    /// These are to support `AsyncRead` and `AsyncWrite` polling methods,
-    /// which cannot use the `async fn` version. This uses reserved reader
-    /// and writer slots.
-    pub fn poll_readiness(&self, cx: &mut Context<'_>, interest: Interest) -> Poll<ReadyEvent> {
-        let curr = self.readiness.load(Acquire);
-        let ready = Ready::from_usize(curr).intersection(interest);
+    pub fn read_readiness(&self) -> Readiness {
+        Readiness(self.read_event.readiness.load(Acquire))
+    }
 
-        if !ready.is_empty() {
-            return Poll::Ready(ReadyEvent {
-                tick: TICK.unpack(curr) as u8,
-                ready,
-            });
+    pub fn write_readiness(&self) -> Readiness {
+        Readiness(self.write_event.readiness.load(Acquire))
+    }
+
+    pub fn notify_event(&self, ev: &mio::event::Event) {
+        let mut notify_read: u16 = 0;
+        let mut notify_write: u16 = 0;
+
+        #[cfg(all(target_os = "freebsd", feature = "net"))]
+        {
+            if ev.is_aio() {
+                notify_read |= readiness::READABLE;
+            }
+            if ev.is_lio() {
+                notify_read |= readiness::READABLE;
+            }
         }
-        if interest == Interest::READABLE {
-            self.reader.register(cx.waker());
-        } else {
-            debug_assert_eq!(interest, Interest::WRITABLE);
-            self.writer.register(cx.waker());
-        };
-        Poll::Pending
-    }
 
-    pub fn clear_readiness(&self, event: ReadyEvent) {
-        // This consumes the current readiness state **except** for closed
-        // states. Closed states are excluded because they are final states.
-        let mask_no_closed = event.ready - Ready::READ_CLOSED - Ready::WRITE_CLOSED;
-        self.set_readiness(Tick::Clear(event.tick), |curr| curr - mask_no_closed);
-    }
-
-    /// Sets the readiness on this `ScheduledIo` by invoking the given closure on
-    /// the current value, returning the previous readiness value.
-    ///
-    /// # Arguments
-    /// - `tick`: whether setting the tick or trying to clear readiness for a
-    ///    specific tick.
-    /// - `f`: a closure returning a new readiness value given the previous
-    ///   readiness.
-    pub fn set_readiness(&self, tick_op: Tick, f: impl Fn(Ready) -> Ready) {
-        let _ = self.readiness.fetch_update(AcqRel, Acquire, |curr| {
-            const MAX_TICK: usize = TICK.max_value() + 1; // same as `1 << 15`
-            let tick = TICK.unpack(curr);
-            let new_tick = match tick_op {
-                // Trying to clear readiness with an old event!
-                Tick::Clear(t) if tick as u8 != t => return None,
-                Tick::Clear(t) => t as usize,
-                Tick::Set => tick.wrapping_add(1) % MAX_TICK,
-            };
-            Some(TICK.pack(new_tick, f(Ready::from_usize(curr)).as_usize()))
-        });
-    }
-
-    /// Notifies all pending waiters that have registered interest in `ready`.
-    ///
-    /// There may be many waiters to notify. Waking the pending task **must** be
-    /// done from outside of the lock otherwise there is a potential for a
-    /// deadlock.
-    ///
-    /// A stack array of wakers is created and filled with wakers to notify, the
-    /// lock is released, and the wakers are notified. Because there may be more
-    /// than 32 wakers to notify, if the stack array fills up, the lock is
-    /// released, the array is cleared, and the iteration continues.
-    pub fn wake(&self, ready: Ready) {
-        if ready.is_readable() {
-            self.reader.wake();
+        if ev.is_readable() {
+            notify_read |= readiness::READABLE;
         }
-        if ready.is_writable() {
-            self.writer.wake();
+        if ev.is_read_closed() {
+            notify_read |= readiness::READ_CLOSED;
+        }
+
+        if ev.is_writable() {
+            notify_write |= readiness::WRITABLE;
+        }
+        if ev.is_write_closed() {
+            notify_write |= readiness::WRITE_CLOSED;
+        }
+
+        if notify_read != 0 {
+            self.read_event.update_readiness_and_notify(notify_read);
+        }
+        if notify_write != 0 {
+            self.write_event.update_readiness_and_notify(notify_write);
+        }
+
+        #[cfg(debug_assertions)]
+        if ev.is_error() && notify_read == 0 && notify_write == 0 {
+            eprintln!("error without readiness: {ev:#?}");
         }
     }
 
-    pub fn ready_event(&self, interest: Interest) -> ReadyEvent {
-        let curr = self.readiness.load(Acquire);
-        ReadyEvent {
-            tick: TICK.unpack(curr) as u8,
-            ready: interest.mask() & Ready::from_usize(curr),
-        }
+    pub fn clear_read_readiness(&self, old: Readiness) {
+        let new = old.0 & !(readiness::READABLE as usize);
+        let _ = self
+            .read_event
+            .readiness
+            .compare_exchange(old.0, new, AcqRel, Acquire);
+    }
+
+    pub fn clear_write_readiness(&self, old: Readiness) {
+        let new = old.0 & !(readiness::WRITABLE as usize);
+        let _ = self
+            .write_event
+            .readiness
+            .compare_exchange(old.0, new, AcqRel, Acquire);
     }
 
     pub fn drop_wakers(&self) {
-        self.reader.take();
-        self.writer.take();
+        self.read_event.waker.take();
+        self.write_event.waker.take();
     }
 }
 
 impl Drop for ScheduledIo {
     fn drop(&mut self) {
-        self.wake(Ready::ALL);
+        self.read_event.waker.wake();
+        self.write_event.waker.wake();
     }
 }
