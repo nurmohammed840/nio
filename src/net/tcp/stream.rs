@@ -1,5 +1,7 @@
+use futures::FutureExt;
+
 use crate::{
-    io::{poll_evented::PollEvented, Interest, Ready},
+    io::{poll_evented::PollEvented, Readiness},
     net::{
         tcp::{OwnedReadHalf, OwnedWriteHalf, ReadHalf, WriteHalf},
         utils::bind,
@@ -32,7 +34,7 @@ impl TcpStream {
         // actually hit an error or not.
         //
         // If all that succeeded then we ship everything on up.
-        self.io.readiness(Interest::WRITABLE, |_| {}).await;
+        self.io.poll_write_readiness().await;
 
         if let Some(e) = self.io.take_error()? {
             return Err(e);
@@ -64,59 +66,43 @@ impl TcpStream {
     }
 
     pub fn peek<'b>(&self, buf: &'b mut [u8]) -> impl Future<Output = Result<usize>> + use<'_, 'b> {
-        self.io.async_io(Interest::READABLE, |io| io.peek(buf))
-    }
-
-    pub fn ready(&self, interest: Interest) -> impl Future<Output = Result<Ready>> + '_ {
-        self.io.readiness(interest, |e| Ok(e.ready))
+        self.io.async_io_read(|io| io.peek(buf))
     }
 
     pub fn readable(&self) -> impl Future<Output = Result<()>> + '_ {
-        self.io.readiness(Interest::READABLE, |_| Ok(()))
+        self.io.poll_read_readiness().map(|_| Ok(()))
     }
 
     pub fn try_read(&self, buf: &mut [u8]) -> Result<usize> {
         use std::io::Read;
-        self.io.try_io(Interest::READABLE, |mut io| io.read(buf))
+        self.io.try_io_read(|mut io| io.read(buf))
     }
 
     pub fn try_read_vectored(&self, bufs: &mut [io::IoSliceMut<'_>]) -> Result<usize> {
         use std::io::Read;
-        self.io
-            .try_io(Interest::READABLE, |mut io| io.read_vectored(bufs))
+        self.io.try_io_read(|mut io| io.read_vectored(bufs))
     }
 
     pub fn writable(&self) -> impl Future<Output = Result<()>> + '_ {
-        self.io.readiness(Interest::WRITABLE, |_| Ok(()))
+        self.io.poll_write_readiness().map(|_| Ok(()))
     }
 
     pub fn try_write(&self, buf: &[u8]) -> Result<usize> {
         use std::io::Write;
-        self.io.try_io(Interest::WRITABLE, |mut io| io.write(buf))
+        self.io.try_io_write(|mut io| io.write(buf))
     }
 
     pub fn try_write_vectored(&self, bufs: &[IoSlice]) -> Result<usize> {
         use std::io::Write;
-        self.io
-            .try_io(Interest::WRITABLE, |mut io| io.write_vectored(bufs))
+        self.io.try_io_write(|mut io| io.write_vectored(bufs))
     }
 
-    pub fn try_io<F, T>(&self, interest: Interest, f: F) -> Result<T>
-    where
-        F: FnOnce() -> Result<T>,
-    {
-        self.io.try_io(interest, |io| io.try_io(f))
-    }
-
-    pub fn async_io<F, T>(
-        &self,
-        interest: Interest,
-        mut f: F,
-    ) -> impl Future<Output = Result<T>> + use<'_, F, T>
-    where
-        F: FnMut() -> Result<T>,
-    {
-        self.io.async_io(interest, move |io| io.try_io(&mut f))
+    #[doc(hidden)]
+    pub async fn __ready(&self, read: bool) -> Result<Readiness> {
+        match read {
+            true => Ok(self.io.poll_read_readiness().await),
+            false => Ok(self.io.poll_write_readiness().await),
+        }
     }
 
     pub fn nodelay(&self) -> Result<bool> {

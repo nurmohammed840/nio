@@ -12,12 +12,12 @@ Add the following dependency to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-nio = "0.0.1"
+nio = "0.0.2"
 ```
 
 Here is a basic echo server example:
 
-```rust
+```rust, ignore
 use nio::net::TcpListener;
 use std::io;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};

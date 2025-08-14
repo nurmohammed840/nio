@@ -3,7 +3,6 @@
 #![cfg(not(miri))]
 
 use futures::FutureExt;
-use nio::io::Interest;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::try_join;
 
@@ -129,8 +128,7 @@ async fn try_read_write() {
     drop(client);
 
     loop {
-        let ready = server.ready(Interest::READABLE).await.unwrap();
-
+        let ready = server.__ready(true).await.unwrap();
         if ready.is_read_closed() {
             return;
         } else {
@@ -277,7 +275,7 @@ fn write_until_pending(stream: &mut TcpStream) -> usize {
 async fn read_closed() {
     let (client, mut server) = create_pair().await;
 
-    let mut ready_fut = task::spawn(client.ready(Interest::READABLE));
+    let mut ready_fut = task::spawn(client.__ready(true));
     assert_pending!(ready_fut.poll());
 
     assert_ok!(server.write_all(b"ping").await);
@@ -294,7 +292,7 @@ async fn write_closed() {
 
     // Fill the write buffer.
     let write_size = write_until_pending(&mut client);
-    let mut ready_fut = task::spawn(client.ready(Interest::WRITABLE));
+    let mut ready_fut = task::spawn(client.__ready(false));
     assert_pending!(ready_fut.poll());
 
     // Drain the socket to make client writable.

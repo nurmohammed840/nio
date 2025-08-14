@@ -1,19 +1,16 @@
 use crate::runtime::Handle;
 
-use super::{
-    scheduled_io::{ReadyEvent, ScheduledIo},
-    Interest,
-};
-use mio::event::Source;
+use super::scheduled_io::{Readiness, ScheduledIo};
+use mio::{event::Source, Interest};
 use std::{
     cell::Cell,
     fmt::{self},
     future::{poll_fn, PollFn},
-    io::{self, IoSlice, Result},
+    io::{self, ErrorKind, IoSlice, Result},
     marker::PhantomData,
     ops::Deref,
     sync::Arc,
-    task::{ready, Context, Poll},
+    task::{Context, Poll},
 };
 
 pub struct PollEvented<E: Source> {
@@ -59,29 +56,27 @@ impl<E: Source> PollEvented<E> {
         Ok(())
     }
 
-    pub fn async_io<F, T>(
+    pub fn async_io_read<F, T>(
         &self,
-        interest: Interest,
         mut f: F,
     ) -> PollFn<impl FnMut(&mut Context) -> Poll<io::Result<T>> + use<'_, E, T, F>>
     where
         F: FnMut(&E) -> Result<T>,
     {
         let io = self.deref();
-        let registration = &self.registration;
-        
+        let scheduled_io = &self.registration.scheduled_io;
+
         poll_fn(move |cx| {
-            if interest == Interest::READABLE {
-                registration.scheduled_io.reader.register(cx.waker());
-            } else {
-                debug_assert_eq!(interest, Interest::WRITABLE);
-                registration.scheduled_io.writer.register(cx.waker());
-            };
+            scheduled_io.read_event.waker.register(cx.waker());
+
             loop {
-                let event = ready!(registration.scheduled_io.poll_readiness(interest));
+                let readiness = scheduled_io.read_readiness();
+                if readiness.is_empty() {
+                    return Poll::Pending;
+                }
                 match f(io) {
-                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                        registration.scheduled_io.clear_readiness(event);
+                    Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
+                        scheduled_io.clear_read_readiness(readiness)
                     }
                     res => return Poll::Ready(res),
                 }
@@ -89,38 +84,108 @@ impl<E: Source> PollEvented<E> {
         })
     }
 
-    pub fn try_io<R, F>(&self, interest: Interest, f: F) -> Result<R>
+    pub fn async_io_write<F, T>(
+        &self,
+        mut f: F,
+    ) -> PollFn<impl FnMut(&mut Context) -> Poll<io::Result<T>> + use<'_, E, T, F>>
+    where
+        F: FnMut(&E) -> Result<T>,
+    {
+        let io = self.deref();
+        let scheduled_io = &self.registration.scheduled_io;
+
+        poll_fn(move |cx| {
+            scheduled_io.write_event.waker.register(cx.waker());
+
+            loop {
+                let readiness = scheduled_io.write_readiness();
+                if readiness.is_empty() {
+                    return Poll::Pending;
+                }
+
+                match f(io) {
+                    Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
+                        scheduled_io.clear_write_readiness(readiness);
+                    }
+                    res => return Poll::Ready(res),
+                }
+            }
+        })
+    }
+
+    pub fn try_io_read<R, F>(&self, f: F) -> Result<R>
     where
         F: FnOnce(&E) -> Result<R>,
     {
-        let event = self.registration.scheduled_io.ready_event(interest);
-        // Don't attempt the operation if the resource is not ready.
-        if event.ready.is_empty() {
-            return Err(io::ErrorKind::WouldBlock.into());
+        let readiness = self.registration.scheduled_io.read_readiness();
+
+        if readiness.is_empty() {
+            return Err(ErrorKind::WouldBlock.into());
         }
+
         match f(self.deref()) {
-            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.registration.scheduled_io.clear_readiness(event);
+            Err(e) if e.kind() == ErrorKind::WouldBlock => {
+                self.registration
+                    .scheduled_io
+                    .clear_read_readiness(readiness);
+
                 Err(e)
             }
             res => res,
         }
     }
 
-    pub fn readiness<T>(
+    pub fn try_io_write<R, F>(&self, f: F) -> Result<R>
+    where
+        F: FnOnce(&E) -> Result<R>,
+    {
+        let readiness = self.registration.scheduled_io.write_readiness();
+
+        if readiness.is_empty() {
+            return Err(ErrorKind::WouldBlock.into());
+        }
+
+        match f(self.deref()) {
+            Err(e) if e.kind() == ErrorKind::WouldBlock => {
+                self.registration
+                    .scheduled_io
+                    .clear_write_readiness(readiness);
+
+                Err(e)
+            }
+            res => res,
+        }
+    }
+
+    pub fn poll_read_readiness(
         &self,
-        interest: Interest,
-        map: fn(ReadyEvent) -> T,
-    ) -> PollFn<impl FnMut(&mut Context) -> Poll<T> + use<'_, E, T>> {
+    ) -> PollFn<impl FnMut(&mut Context) -> Poll<Readiness> + use<'_, E>> {
         let scheduled_io = &self.registration.scheduled_io;
         poll_fn(move |cx| {
-            if interest == Interest::READABLE {
-                scheduled_io.reader.register(cx.waker());
-            } else {
-                debug_assert_eq!(interest, Interest::WRITABLE);
-                scheduled_io.writer.register(cx.waker());
-            };
-            scheduled_io.poll_readiness(interest).map(map)
+            scheduled_io.read_event.waker.register(cx.waker());
+
+            let readiness = scheduled_io.read_readiness();
+            if readiness.is_empty() {
+                return Poll::Pending;
+            }
+
+            Poll::Ready(readiness)
+        })
+    }
+
+    pub fn poll_write_readiness(
+        &self,
+    ) -> PollFn<impl FnMut(&mut Context) -> Poll<Readiness> + use<'_, E>> {
+        let scheduled_io = &self.registration.scheduled_io;
+        poll_fn(move |cx| {
+            scheduled_io.write_event.waker.register(cx.waker());
+
+            let readiness = scheduled_io.write_readiness();
+            if readiness.is_empty() {
+                return Poll::Pending;
+            }
+
+            Poll::Ready(readiness)
         })
     }
 }
@@ -133,13 +198,14 @@ impl<E: Source> PollEvented<E> {
     {
         use std::io::Read;
 
-        self.registration.scheduled_io.reader.register(cx.waker());
+        let scheduled_io = &self.registration.scheduled_io;
+        scheduled_io.read_event.waker.register(cx.waker());
 
         loop {
-            let event = ready!(self
-                .registration
-                .scheduled_io
-                .poll_readiness(Interest::READABLE));
+            let readiness = scheduled_io.read_readiness();
+            if readiness.is_empty() {
+                return Poll::Pending;
+            }
 
             // used only when the cfgs below apply
             #[allow(unused_variables)]
@@ -176,12 +242,12 @@ impl<E: Source> PollEvented<E> {
                         )
                     ))]
                     if 0 < n && n < len {
-                        self.registration.scheduled_io.clear_readiness(event);
+                        scheduled_io.clear_read_readiness(readiness);
                     }
                     return Poll::Ready(Ok(n));
                 }
-                Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
-                    self.registration.scheduled_io.clear_readiness(event);
+                Err(e) if e.kind() == ErrorKind::WouldBlock => {
+                    scheduled_io.clear_read_readiness(readiness);
                 }
                 Err(e) => return Poll::Ready(Err(e)),
             }
@@ -194,13 +260,14 @@ impl<E: Source> PollEvented<E> {
     {
         use std::io::Write;
 
-        self.registration.scheduled_io.writer.register(cx.waker());
+        let scheduled_io = &self.registration.scheduled_io;
+        scheduled_io.write_event.waker.register(cx.waker());
 
         loop {
-            let event = ready!(self
-                .registration
-                .scheduled_io
-                .poll_readiness(Interest::WRITABLE));
+            let readiness = scheduled_io.write_readiness();
+            if readiness.is_empty() {
+                return Poll::Pending;
+            }
 
             match self.deref().write(buf) {
                 Ok(n) => {
@@ -212,12 +279,12 @@ impl<E: Source> PollEvented<E> {
                         && n < buf.len()
                         && (!cfg!(windows) && !cfg!(mio_unsupported_force_poll_poll))
                     {
-                        self.registration.scheduled_io.clear_readiness(event);
+                        scheduled_io.clear_write_readiness(readiness);
                     }
                     return Poll::Ready(Ok(n));
                 }
-                Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
-                    self.registration.scheduled_io.clear_readiness(event);
+                Err(e) if e.kind() == ErrorKind::WouldBlock => {
+                    scheduled_io.clear_write_readiness(readiness);
                 }
                 Err(e) => return Poll::Ready(Err(e)),
             }
@@ -233,18 +300,18 @@ impl<E: Source> PollEvented<E> {
         &'a E: io::Write + 'a,
     {
         use std::io::Write;
-
-        self.registration.scheduled_io.writer.register(cx.waker());
+        let scheduled_io = &self.registration.scheduled_io;
+        scheduled_io.write_event.waker.register(cx.waker());
 
         loop {
-            let event = ready!(self
-                .registration
-                .scheduled_io
-                .poll_readiness(Interest::WRITABLE));
+            let readiness = scheduled_io.write_readiness();
+            if readiness.is_empty() {
+                return Poll::Pending;
+            }
 
             match self.deref().write_vectored(bufs) {
-                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                    self.registration.scheduled_io.clear_readiness(event);
+                Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
+                    scheduled_io.clear_write_readiness(readiness);
                 }
                 res => return Poll::Ready(res),
             }

@@ -21,7 +21,7 @@ impl Events {
         ))
     }
 
-    pub fn is_wake(ev: &mio::event::Event) -> bool {
+    pub fn has_woken(ev: &mio::event::Event) -> bool {
         ev.token() == WAKE_TOKEN
     }
 
@@ -33,7 +33,7 @@ impl Events {
         self.poll.registry().try_clone()
     }
 
-    pub fn is_empty(&mut self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.events.is_empty()
     }
 

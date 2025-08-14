@@ -201,7 +201,6 @@ assert_value!(nio::net::tcp::ReadHalf<'_>: Send & !Sync & Unpin);
 assert_value!(nio::net::tcp::WriteHalf<'_>: Send & !Sync & Unpin);
 async_assert_fn!(nio::net::TcpListener::accept(_): Send & Sync & Unpin);
 async_assert_fn!(nio::net::TcpStream::peek(_, &mut [u8]): Send & Sync & Unpin);
-async_assert_fn!(nio::net::TcpStream::ready(_, nio::io::Interest): Send & Sync & Unpin);
 async_assert_fn!(nio::net::TcpStream::readable(_): Send & Sync & Unpin);
 async_assert_fn!(nio::net::TcpStream::writable(_): Send & Sync & Unpin);
 
@@ -214,7 +213,6 @@ cfg_not_wasi! {
         async_assert_fn!(nio::net::UdpSocket::connect(_, SocketAddr): Send & Sync & Unpin);
         async_assert_fn!(nio::net::UdpSocket::peek_from(_, &mut [u8]): Send & Sync & Unpin);
         async_assert_fn!(nio::net::UdpSocket::readable(_): Send & Sync & Unpin);
-        async_assert_fn!(nio::net::UdpSocket::ready(_, nio::io::Interest): Send & Sync & Unpin);
         async_assert_fn!(nio::net::UdpSocket::recv(_, &mut [u8]): Send & Sync & Unpin);
         async_assert_fn!(nio::net::UdpSocket::recv_from(_, &mut [u8]): Send & Sync & Unpin);
         async_assert_fn!(nio::net::UdpSocket::send(_, &[u8]): Send & Sync & Unpin);
