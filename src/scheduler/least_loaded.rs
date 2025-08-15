@@ -114,15 +114,8 @@ impl Scheduler {
         (scheduler, queues)
     }
 
-    #[inline]
     fn least_loaded_worker(&self) -> &Worker {
-        unsafe {
-            self.workers
-                .next_batch()
-                .iter()
-                .min_by_key(|a| a.len.get())
-                .unwrap_unchecked()
-        }
+        unsafe { min_by_key(self.workers.next_batch(), |w| w.len.get()) }
     }
 
     pub fn schedule(&self, task: Task) {
@@ -164,4 +157,22 @@ impl Clone for Scheduler {
             workers: Arc::clone(&self.workers),
         }
     }
+}
+
+#[inline]
+unsafe fn min_by_key<T, B: Ord>(data: &[T], f: fn(&T) -> B) -> &T {
+    debug_assert!(!data.is_empty());
+
+    let mut val_x = data.get_unchecked(0);
+    let mut x = f(val_x);
+
+    for val_y in data.get_unchecked(1..) {
+        let y = f(val_y);
+        if x < y {
+            break;
+        }
+        x = y;
+        val_x = val_y;
+    }
+    val_x
 }
