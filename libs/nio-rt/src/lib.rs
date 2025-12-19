@@ -1,0 +1,73 @@
+mod blocking;
+pub mod rt;
+
+
+use std::time::Duration;
+
+pub struct RuntimeConfig {
+    worker_threads: usize,
+    worker_name: Box<dyn Fn(usize) -> String>,
+
+    max_blocking_threads: u16,
+    thread_stack_size: usize,
+    thread_name: Box<dyn Fn(usize) -> String>,
+    thread_timeout: Option<Duration>,
+}
+
+impl Default for RuntimeConfig {
+    fn default() -> Self {
+        Self {
+            worker_threads: std::thread::available_parallelism()
+                .map(|nthread| nthread.get())
+                .unwrap_or(1),
+
+            thread_stack_size: 0,
+            max_blocking_threads: 512,
+            thread_timeout: Some(Duration::from_secs(10)),
+            thread_name: Box::new(|id| format!("Thread: {id}")),
+            worker_name: Box::new(|id| format!("Worker: {id}")),
+        }
+    }
+}
+
+impl RuntimeConfig {
+    pub fn new() -> RuntimeConfig {
+        Self::default()
+    }
+
+    pub fn worker_threads(mut self, val: usize) -> Self {
+        self.worker_threads = val;
+        self
+    }
+
+    pub fn thread_stack_size(mut self, size: usize) -> Self {
+        self.thread_stack_size = size;
+        self
+    }
+
+    pub fn max_blocking_threads(mut self, val: u16) -> Self {
+        self.max_blocking_threads = val;
+        self
+    }
+
+    pub fn thread_timeout(mut self, dur: Option<Duration>) -> Self {
+        self.thread_timeout = dur;
+        self
+    }
+
+    pub fn thread_name<F>(mut self, f: F) -> Self
+    where
+        F: Fn(usize) -> String + 'static,
+    {
+        self.thread_name = Box::new(f);
+        self
+    }
+
+    pub fn worker_name<F>(mut self, f: F) -> Self
+    where
+        F: Fn(usize) -> String + 'static,
+    {
+        self.worker_name = Box::new(f);
+        self
+    }
+}
