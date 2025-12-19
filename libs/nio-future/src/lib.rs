@@ -1,10 +1,29 @@
 use std::{
     future::Future,
     mem,
-    pin::pin,
+    pin::{Pin, pin},
     sync::{Arc, Condvar, Mutex},
     task::{Context, Poll, Wake, Waker},
 };
+
+pub async fn yield_now() {
+    /// Yield implementation
+    struct YieldNow {
+        yielded: bool,
+    }
+    impl Future for YieldNow {
+        type Output = ();
+        fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+            if self.yielded {
+                return Poll::Ready(());
+            }
+            self.yielded = true;
+            cx.waker().wake_by_ref();
+            Poll::Pending
+        }
+    }
+    YieldNow { yielded: false }.await;
+}
 
 pub fn block_on<Fut>(fut: Fut) -> Fut::Output
 where
