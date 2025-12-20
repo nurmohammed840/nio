@@ -831,6 +831,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "nio-task"
+version = "0.1.0"
+
+[[package]]
 name = "nio-threadpool"
 version = "0.1.0"
 dependencies = [
