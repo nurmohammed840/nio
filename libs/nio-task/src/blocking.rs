@@ -1,4 +1,4 @@
-use crate::raw::{Header, RawTask, RawTaskVTable, Stage};
+use crate::raw::{Header, RawTask, RawTaskVTable, Fut};
 use crate::waker::NOOP_WAKER;
 use crate::{Id, JoinError, JoinHandle};
 
@@ -18,14 +18,14 @@ impl BlockingTask {
     {
         let raw_task = Arc::new(BlockingRawTask {
             header: Header::new(),
-            stage: UnsafeCell::new(Stage::Running(f)),
+            func: UnsafeCell::new(Fut::Running(f)),
         });
         let join = JoinHandle::new(raw_task.clone());
         (BlockingTask { raw_task }, join)
     }
 
     pub fn run(self) {
-        unsafe { self.raw_task.process(&NOOP_WAKER) };
+        unsafe { self.raw_task.poll(&NOOP_WAKER) };
     }
 
     #[inline]
@@ -36,7 +36,7 @@ impl BlockingTask {
 
 pub struct BlockingRawTask<F, T> {
     header: Header,
-    stage: UnsafeCell<Stage<F, T>>,
+    func: UnsafeCell<Fut<F, T>>,
 }
 
 unsafe impl<F: Send, T> Sync for BlockingRawTask<F, T> {}
@@ -55,17 +55,17 @@ where
     }
 
     unsafe fn drop_task_or_output(&self) {
-        *self.stage.get() = Stage::Consumed;
+        *self.func.get() = Fut::Droped;
     }
 
     /// Panicking is acceptable here, as `BlockingTask` is only execute within the thread pool
-    unsafe fn process(&self, _: &Waker) -> bool {
-        let output = match (*self.stage.get()).take() {
-            Stage::Running(func) => func(),
+    unsafe fn poll(&self, _: &Waker) -> bool {
+        let output = match (*self.func.get()).take() {
+            Fut::Running(func) => func(),
             _ => unreachable!(),
         };
-        (*self.stage.get()).set_output(output);
-        if !self.header.transition_to_complete() {
+        (*self.func.get()).set_output(output);
+        if !self.header.transition_to_complete_and_notify_output_if_intrested() {
             unsafe { self.drop_task_or_output() };
         }
         false
@@ -77,7 +77,7 @@ where
         }
     }
 
-    unsafe fn abort_task(&self) {}
+    unsafe fn abort_task(self: Arc<Self>) {}
 
     unsafe fn schedule(self: Arc<Self>) {}
 }
@@ -88,8 +88,8 @@ where
     T: Send + 'static,
 {
     unsafe fn take_output(&self) -> Result<F::Output, JoinError> {
-        match (*self.stage.get()).take() {
-            Stage::Finished(output) => output,
+        match (*self.func.get()).take() {
+            Fut::Result(output) => output,
             _ => panic!("JoinHandle polled after completion"),
         }
     }

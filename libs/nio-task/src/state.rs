@@ -6,32 +6,31 @@ use std::{
     },
 };
 
-/// The task is waiting in the queue, Ready to make progress when polled again.
+/// The task is waiting in the queue, Ready to make progress when polled again.  
+///
+/// It was woken while in the `RUNNING` state,
+/// meaning it should be polled again to make further progress.
 pub const NOTIFIED: usize = 1;
 
 // The task is currently being run.
 pub const RUNNING: usize = 2;
 
 /// The task is sleeping, waiting to be woken up for further execution.
-pub const SLEEP: usize = 3;
-
-/// The task was polled but did not complete. It was woken while in the `RUNNING` state,
-/// meaning it should be polled again to make further progress.
-pub const YIELD: usize = 4;
-
-/// The task has been cancelled and will not be polled again.
-pub const ABORT: usize = 5;
+pub const SLEEP: usize = 0;
 
 /// The task has been polled and has finished execution.
-pub const COMPLETE: usize = 0b111;
+pub const COMPLETE: usize = 3;
+
+/// The task has been cancelled.
+pub const CANCELLED: usize = 0b1_00;
 
 /// The join handle is still around.
-pub const JOIN_INTEREST: usize = 0b1_000;
+pub const JOIN_INTEREST: usize = 0b10_00;
 
 /// A join handle waker has been set.
-pub const JOIN_WAKER: usize = 0b10_000;
+pub const JOIN_WAKER: usize = 0b100_00;
 
-pub type UpdateResult = Result<Snapshot, Snapshot>;
+pub type UpdateResult = Result<Snapshot, ()>;
 
 pub struct State(AtomicUsize);
 
@@ -44,12 +43,13 @@ impl State {
         Snapshot(self.0.load(Acquire))
     }
 
-    pub fn fetch_update<F>(&self, mut f: F) -> Result<Snapshot, Snapshot>
+    pub fn fetch_update<F, E>(&self, mut f: F) -> Result<Snapshot, E>
     where
-        F: FnMut(Snapshot) -> Option<Snapshot>,
+        F: FnMut(Snapshot) -> Result<Snapshot, E>,
     {
         let mut prev = self.load();
-        while let Some(next) = f(prev) {
+        loop {
+            let next = f(prev)?;
             match self
                 .0
                 .compare_exchange_weak(prev.0, next.0, AcqRel, Acquire)
@@ -58,7 +58,6 @@ impl State {
                 Err(next_prev) => prev = Snapshot(next_prev),
             }
         }
-        Err(prev)
     }
 
     pub fn set_complete(&self) -> Snapshot {
@@ -69,9 +68,9 @@ impl State {
         self.fetch_update(|snapshot| {
             debug_assert!(snapshot.has(JOIN_INTEREST));
             if snapshot.is(COMPLETE) {
-                return None;
+                return Err(());
             }
-            Some(snapshot.remove(JOIN_INTEREST))
+            Ok(snapshot.remove(JOIN_INTEREST))
         })
     }
 
@@ -81,9 +80,9 @@ impl State {
             debug_assert!(!snapshot.has(JOIN_WAKER));
 
             if snapshot.is(COMPLETE) {
-                return None;
+                return Err(());
             }
-            Some(snapshot.with(JOIN_WAKER))
+            Ok(snapshot.with(JOIN_WAKER))
         })
     }
 
@@ -93,9 +92,9 @@ impl State {
             debug_assert!(snapshot.has(JOIN_WAKER));
 
             if snapshot.is(COMPLETE) {
-                return None;
+                return Err(());
             }
-            Some(snapshot.remove(JOIN_WAKER))
+            Ok(snapshot.remove(JOIN_WAKER))
         })
     }
 }
@@ -106,22 +105,22 @@ pub struct Snapshot(usize);
 
 impl Snapshot {
     pub fn get(&self) -> usize {
-        self.0 & 0b_111
+        self.0 & 0b_11
     }
 
     pub fn set(&self, state: usize) -> Snapshot {
-        Self((self.0 & !0b_111) | state)
+        Self((self.0 & !0b_11) | state)
     }
 
     pub fn is(&self, state: usize) -> bool {
-        self.0 & 0b_111 == state
+        self.0 & 0b_11 == state
     }
 
     pub fn has(&self, flag: usize) -> bool {
         self.0 & flag == flag
     }
 
-    fn with(&self, flag: usize) -> Snapshot {
+    pub fn with(&self, flag: usize) -> Snapshot {
         Self(self.0 | flag)
     }
 
@@ -139,8 +138,6 @@ impl fmt::Debug for Snapshot {
                     NOTIFIED => "NOTIFIED",
                     RUNNING => "RUNNING",
                     SLEEP => "SLEEP",
-                    YIELD => "YIELD",
-                    ABORT => "ABORT",
                     COMPLETE => "COMPLETE",
                     _ => "UNKNOWN",
                 },

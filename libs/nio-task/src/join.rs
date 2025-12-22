@@ -1,11 +1,10 @@
 use crate::raw::RawTask;
 
-use super::{COMPLETE, abort::AbortHandle, error::JoinError, id::Id};
+use super::{COMPLETE, error::JoinError, id::Id};
 use std::{
     fmt,
     future::Future,
     marker::PhantomData,
-    panic,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -156,7 +155,7 @@ use std::{
 /// [`std::thread::JoinHandle`]: std::thread::JoinHandle
 /// [`JoinError`]: crate::task::JoinError
 pub struct JoinHandle<T> {
-    raw: RawTask,
+    raw: Option<RawTask>,
     _p: PhantomData<T>,
 }
 unsafe impl<T: Send> Send for JoinHandle<T> {}
@@ -165,7 +164,7 @@ unsafe impl<T: Send> Sync for JoinHandle<T> {}
 impl<T> JoinHandle<T> {
     pub(super) fn new(raw: RawTask) -> JoinHandle<T> {
         JoinHandle {
-            raw,
+            raw: Some(raw),
             _p: PhantomData,
         }
     }
@@ -214,9 +213,18 @@ impl<T> JoinHandle<T> {
     /// [cancelled]: method@super::error::JoinError::is_cancelled
     /// [the module level docs]: crate::task#cancellation
     /// [`spawn_blocking`]: crate::task::spawn_blocking
-    pub fn abort(&self) {
+    pub fn abort(mut self) {
+        self.drop_interest();
         unsafe {
-            self.raw.abort_task();
+            self.raw.take().unwrap().abort_task();
+        }
+    }
+
+    fn drop_interest(&mut self) {
+        // Try to unset `JOIN_INTEREST`. This must be done as a first step in
+        // case the task concurrently completed.
+        if let Some(raw) = self.raw.take() {
+            if raw.header().state.unset_join_interested().is_err() {}
         }
     }
 
@@ -248,48 +256,8 @@ impl<T> JoinHandle<T> {
     /// ```
     /// [`abort`]: method@JoinHandle::abort
     pub fn is_finished(&self) -> bool {
-        let state = self.raw.header().state.load();
+        let state = self.raw.as_ref().unwrap().header().state.load();
         state.is(COMPLETE)
-    }
-
-    /// Returns a new `AbortHandle` that can be used to remotely abort this task.
-    ///
-    /// Awaiting a task cancelled by the `AbortHandle` might complete as usual if the task was
-    /// already completed at the time it was cancelled, but most likely it
-    /// will fail with a [cancelled] `JoinError`.
-    ///
-    /// ```rust
-    /// use nio::{time, task};
-    ///
-    /// # #[nio::main]
-    /// # async fn main() {
-    /// let mut handles = Vec::new();
-    ///
-    /// handles.push(nio::spawn(async {
-    ///    time::sleep(time::Duration::from_secs(10)).await;
-    ///    true
-    /// }));
-    ///
-    /// handles.push(nio::spawn(async {
-    ///    time::sleep(time::Duration::from_secs(10)).await;
-    ///    false
-    /// }));
-    ///
-    /// let abort_handles: Vec<task::AbortHandle> = handles.iter().map(|h| h.abort_handle()).collect();
-    ///
-    /// for handle in abort_handles {
-    ///     handle.abort();
-    /// }
-    ///
-    /// for handle in handles {
-    ///     assert!(handle.await.unwrap_err().is_cancelled());
-    /// }
-    /// # }
-    /// ```
-    /// [cancelled]: method@super::error::JoinError::is_cancelled
-    #[must_use = "abort handles do nothing unless `.abort` is called"]
-    pub fn abort_handle(&self) -> AbortHandle {
-        AbortHandle::new(self.raw.clone())
     }
 
     /// Returns a [task ID] that uniquely identifies this task relative to other
@@ -302,7 +270,7 @@ impl<T> JoinHandle<T> {
     /// [task ID]: crate::task::Id
     /// [unstable]: crate#unstable-features
     pub fn id(&self) -> Id {
-        Id::new(&self.raw)
+        Id::new(&self.raw.as_ref().unwrap())
     }
 }
 
@@ -327,6 +295,8 @@ impl<T> Future for JoinHandle<T> {
         // The type of `T` must match the task's output type.
         unsafe {
             self.raw
+                .as_ref()
+                .unwrap()
                 .read_output(&mut ret as *mut _ as *mut (), cx.waker());
         }
 
@@ -336,22 +306,7 @@ impl<T> Future for JoinHandle<T> {
 
 impl<T> Drop for JoinHandle<T> {
     fn drop(&mut self) {
-        // Try to unset `JOIN_INTEREST`. This must be done as a first step in
-        // case the task concurrently completed.
-        if self.raw.header().state.unset_join_interested().is_err() {
-            // It is our responsibility to drop the output. This is critical as
-            // the task output may not be `Send` and as such must remain with
-            // the scheduler or `JoinHandle`. i.e. if the output remains in the
-            // task structure until the task is deallocated, it may be dropped
-            // by a Waker on any arbitrary thread.
-            //
-            // Panics are delivered to the user via the `JoinHandle`. Given that
-            // they are dropping the `JoinHandle`, we assume they are not
-            // interested in the panic and swallow it.
-            let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-                unsafe { self.raw.drop_task_or_output() };
-            }));
-        }
+        self.drop_interest();
     }
 }
 

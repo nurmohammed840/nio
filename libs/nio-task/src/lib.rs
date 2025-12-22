@@ -1,6 +1,5 @@
 #![allow(unsafe_op_in_unsafe_fn)]
 
-mod abort;
 mod blocking;
 mod error;
 mod id;
@@ -11,7 +10,6 @@ mod waker;
 
 use crate::raw::*;
 
-pub use abort::AbortHandle;
 pub use blocking::BlockingTask;
 pub use error::JoinError;
 pub use id::Id;
@@ -35,7 +33,7 @@ pub trait Scheduler: Clone + Send + 'static {
 
 struct RawTaskInner<F: Future, S: Scheduler> {
     header: Header,
-    future: UnsafeCell<Stage<F, F::Output>>,
+    future: UnsafeCell<Fut<F, F::Output>>,
     scheduler: S,
 }
 
@@ -54,7 +52,7 @@ impl Task {
     {
         let raw = Arc::new(RawTaskInner {
             header: Header::new(),
-            future: UnsafeCell::new(Stage::Running(future)),
+            future: UnsafeCell::new(Fut::Running(future)),
             scheduler,
         });
         let join_handle = JoinHandle::new(raw.clone());
@@ -62,14 +60,17 @@ impl Task {
     }
 
     #[inline]
-    pub fn process(&mut self) -> bool {
+    pub fn poll(self) -> Option<Self> {
         // Don't increase ref-counter
         let raw_task = unsafe { Arc::from_raw(Arc::as_ptr(&self.raw_task)) };
         // Don't decrease ref-counter
         let waker = ManuallyDrop::new(raw_task.waker());
 
-        // SAFETY: `Task` does not implement `Clone` and we have `&mut` access
-        unsafe { self.raw_task.process(&waker) }
+        // SAFETY: `Task` does not implement `Clone` and we have owned access
+        if unsafe { self.raw_task.poll(&waker) } {
+            return Some(self);
+        }
+        None
     }
 
     #[inline]
@@ -99,38 +100,43 @@ where
         &self.header
     }
 
-    unsafe fn process(&self, waker: &Waker) -> bool {
+    /// State transitions:
+    ///
+    /// ```markdown
+    /// [ NOTIFIED -> RUNNING -> SLEEP? ]+ -> COMPLETE?
+    /// ```
+    unsafe fn poll(&self, waker: &Waker) -> bool {
         if self.header.transition_to_running() {
             let action = panic::catch_unwind(AssertUnwindSafe(|| {
                 let poll_result = unsafe {
                     let fut = match &mut *self.future.get() {
-                        Stage::Running(fut) => Pin::new_unchecked(fut),
+                        Fut::Running(fut) => Pin::new_unchecked(fut),
                         _ => unreachable!(),
                     };
-                    let mut cx = Context::from_waker(waker);
-                    fut.poll(&mut cx)
+                    fut.poll(&mut Context::from_waker(waker))
                 };
-                let stage = match poll_result {
-                    Poll::Pending => match self.header.on_pending() {
-                        yielded @ PendingAction::Yield(_) => return yielded,
-                        PendingAction::AbortOrComplete => {
-                            Stage::Finished(Err(JoinError::cancelled()))
-                        }
+                let result = match poll_result {
+                    Poll::Ready(val) => Fut::Result(Ok(val)),
+                    Poll::Pending => match self.header.transition_to_sleep() {
+                        PendingState::AbortOrComplete => Fut::Result(Err(JoinError::cancelled())),
+                        pending @ PendingState::Yielded(_) => return pending,
                     },
-                    Poll::Ready(val) => Stage::Finished(Ok(val)),
                 };
-                unsafe { *self.future.get() = stage }
-                PendingAction::AbortOrComplete
+                unsafe { *self.future.get() = result }
+                PendingState::AbortOrComplete
             }));
 
             match action {
-                Ok(PendingAction::Yield(yielded)) => return yielded,
-                Ok(PendingAction::AbortOrComplete) => {}
+                Ok(PendingState::Yielded(is_yielded)) => return is_yielded,
+                Ok(PendingState::AbortOrComplete) => {}
                 Err(panic_on_poll) => unsafe {
                     (*self.future.get()).set_err_output(JoinError::panic(panic_on_poll))
                 },
             }
-            if !self.header.transition_to_complete() {
+            if !self
+                .header
+                .transition_to_complete_and_notify_output_if_intrested()
+            {
                 let _ =
                     panic::catch_unwind(AssertUnwindSafe(|| unsafe { self.drop_task_or_output() }));
             }
@@ -149,15 +155,12 @@ where
     }
 
     unsafe fn drop_task_or_output(&self) {
-        *self.future.get() = Stage::Consumed
+        *self.future.get() = Fut::Droped
     }
 
-    unsafe fn abort_task(&self) {
+    unsafe fn abort_task(self: Arc<Self>) {
         if self.header.transition_to_abort() {
-            self.cancel_task();
-            if !self.header.transition_to_complete() {
-                self.drop_task_or_output();
-            }
+            self.schedule()
         }
     }
 }
@@ -170,7 +173,7 @@ where
 {
     unsafe fn take_output(&self) -> Result<F::Output, JoinError> {
         match (*self.future.get()).take() {
-            Stage::Finished(output) => output,
+            Fut::Result(output) => output,
             _ => panic!("JoinHandle polled after completion"),
         }
     }
@@ -181,10 +184,10 @@ where
         });
     }
 
-    unsafe fn cancel_task(&self) {
-        let panic_result = panic::catch_unwind(AssertUnwindSafe(|| self.drop_task_or_output()));
-        (*self.future.get()).set_err_output(JoinError::from(panic_result));
-    }
+    // unsafe fn drop_task_and_set_err_output(&self) {
+    //     let panic_result = panic::catch_unwind(AssertUnwindSafe(|| self.drop_task_or_output()));
+    //     (*self.future.get()).set_err_output(JoinError::from(panic_result));
+    // }
 }
 
 impl<F, S> Wake for RawTaskInner<F, S>
