@@ -12,15 +12,15 @@ impl RuntimeConfig {
             .name(self.thread_name);
 
         Runtime {
-            workers: Box::new([]),
-            threadpool,
+            _workers: Box::new([]),
+            _threadpool: threadpool,
         }
     }
 }
 
 pub struct Runtime {
-    workers: Box<[Worker]>,
-    threadpool: ThreadPool<BlockingTask>,
+    _workers: Box<[Worker]>,
+    _threadpool: ThreadPool<BlockingTask>,
 }
 
 // -------------------------------------------

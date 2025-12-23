@@ -3,14 +3,14 @@ use std::{cell::UnsafeCell, mem, sync::Arc, task::Waker};
 
 #[repr(C)] // https://github.com/rust-lang/miri/issues/3780
 pub enum Fut<F, T> {
-    Running(F),
+    Future(F),
     Result(Result<T, JoinError>),
     Droped,
 }
 
 pub enum PendingState {
     /// `false` if task is sleeping
-    Yielded(bool),
+    YieldOrSleep(bool),
     AbortOrComplete,
 }
 
@@ -19,12 +19,16 @@ impl<F, T> Fut<F, T> {
         mem::replace(self, Self::Droped)
     }
 
-    pub(crate) fn set_output(&mut self, val: T) {
-        *self = Self::Result(Ok(val));
+    pub(crate) fn drop(&mut self) {
+        *self = Self::Droped;
     }
 
-    pub(crate) fn set_err_output(&mut self, join_error: JoinError) {
-        *self = Self::Result(Err(join_error));
+    pub(crate) fn set_output(&mut self, value: T) {
+        *self = Self::Result(Ok(value));
+    }
+
+    pub(crate) fn set_err_output(&mut self, error: JoinError) {
+        *self = Self::Result(Err(error));
     }
 }
 
@@ -34,13 +38,14 @@ pub(crate) trait RawTaskVTable: Send + Sync {
     fn header(&self) -> &Header;
     fn waker(self: Arc<Self>) -> Waker;
 
-    unsafe fn drop_task_or_output(&self);
     unsafe fn poll(&self, waker: &Waker) -> bool;
+    unsafe fn schedule(self: Arc<Self>);
+
     unsafe fn abort_task(self: Arc<Self>);
+    unsafe fn drop_join_handler(&self);
 
     /// `dst: &mut Poll<Result<Future::Output, JoinError>>`
     unsafe fn read_output(&self, dst: *mut (), waker: &Waker);
-    unsafe fn schedule(self: Arc<Self>);
 }
 
 pub(crate) struct Header {
@@ -64,9 +69,7 @@ impl Header {
                 if state == NOTIFIED {
                     return Ok(snapshot.set(RUNNING));
                 }
-                if cfg!(debug_assertions) {
-                    panic!("invalid task state: {snapshot:?}");
-                }
+                debug_assert!(state == COMPLETE, "invalid task state: {snapshot:?}");
                 Err(())
             })
             .is_ok()
@@ -89,8 +92,8 @@ impl Header {
             return false;
         }
         if snapshot.has(JOIN_WAKER) {
-            match unsafe { (*self.join_waker.get()).as_ref() } {
-                Some(waker) => waker.wake_by_ref(),
+            match unsafe { (*self.join_waker.get()).take() } {
+                Some(waker) => waker.wake(),
                 None => panic!("waker missing"),
             }
         }
@@ -113,10 +116,10 @@ impl Header {
             }
 
             debug_assert!(state == NOTIFIED, "invalid task state: {snapshot:?}");
-            Err(PendingState::Yielded(true))
+            Err(PendingState::YieldOrSleep(true))
         });
         match op {
-            Ok(_) => PendingState::Yielded(false),
+            Ok(_) => PendingState::YieldOrSleep(false),
             Err(state) => state,
         }
     }
@@ -135,9 +138,9 @@ impl Header {
         op.is_ok_and(|s| s.is(SLEEP))
     }
 
-    /// NOTIFIED, with
+    /// Return `true` if the task is in `SLEEP` state
     pub fn transition_to_abort(&self) -> bool {
-        let op = self.state.fetch_update(|snapshot| {
+        let op = self.state.fetch_update(|snapshot: Snapshot| {
             let state = snapshot.get();
             if state == RUNNING || state == SLEEP {
                 return Ok(snapshot.with(CANCELLED).set(NOTIFIED));
@@ -147,43 +150,48 @@ impl Header {
         op.is_ok_and(|s| s.is(SLEEP))
     }
 
-    pub fn can_read_output(&self, waker: &Waker) -> bool {
+    pub fn can_read_output_or_notify_when_readable(&self, waker: &Waker) -> bool {
         let snapshot = self.state.load();
         debug_assert!(snapshot.has(JOIN_INTEREST));
 
         if snapshot.is(COMPLETE) {
             return true;
         }
-        // If the task is not complete, try storing the provided waker in the task's waker field.
-        let res = if snapshot.has(JOIN_WAKER) {
+        let res = if !snapshot.has(JOIN_WAKER) {
+            // the task is not complete, try storing the provided waker in the task's waker field.
+            // SAFETY: `JOIN_WAKER` is not set, see docs of `JOIN_WAKER` flag.
+            unsafe { self.set_join_waker(waker.clone()) }
+        } else {
+            // We need to replace it.
+            // Optimization: Avoid storing the waker, if it is the same as the current one.
             unsafe {
-                let join_waker = (*self.join_waker.get()).as_ref().unwrap();
-                if join_waker.will_wake(waker) {
+                let old_waker = (*self.join_waker.get()).as_ref().unwrap();
+                if old_waker.will_wake(waker) {
                     return false;
                 }
             }
             self.state
                 .unset_waker()
-                .and_then(|_| self.set_join_waker(waker.clone()))
-        } else {
-            self.set_join_waker(waker.clone())
+                // SAFETY: `JOIN_WAKER` unset successfully, we can set the new waker.
+                // We have the exclusive access to the waker field.
+                .and_then(|_| unsafe { self.set_join_waker(waker.clone()) })
         };
 
         match res {
             Ok(_) => false,
-            Err(_s) => true,
+            Err(_) => true, // Task is `COMPLETE`
         }
     }
 
     /// This function return `Err(..)` If task is COMPLETE.
-    fn set_join_waker(&self, waker: Waker) -> Result<Snapshot, ()> {
+    unsafe fn set_join_waker(&self, waker: Waker) -> Result<Snapshot, ()> {
         // Safety: Only the `JoinHandle` may set the `waker` field. When
         // `JOIN_INTEREST` is **not** set, nothing else will touch the field.
-        unsafe { *self.join_waker.get() = Some(waker) };
-        let res = self.state.set_join_waker();
+        *self.join_waker.get() = Some(waker);
+        let res = self.state.set_waker();
         // If the state could not be updated, then clear the join waker
         if res.is_err() {
-            unsafe { *self.join_waker.get() = None };
+            *self.join_waker.get() = None;
         }
         res
     }

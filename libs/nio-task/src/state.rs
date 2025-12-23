@@ -27,7 +27,12 @@ pub const CANCELLED: usize = 0b1_00;
 /// The join handle is still around.
 pub const JOIN_INTEREST: usize = 0b10_00;
 
-/// A join handle waker has been set.
+/// A waker has been set.
+///
+/// After setting this flag, the caller (who waiting for the task to complete to receive the output)
+/// lose access of [`crate::raw::Header::join_waker`] field, until this flag is unset.
+///
+/// This flag represents ownership of the waker stored in [`crate::raw::Header::join_waker`] field.
 pub const JOIN_WAKER: usize = 0b100_00;
 
 pub type UpdateResult = Result<Snapshot, ()>;
@@ -43,10 +48,10 @@ impl State {
         Snapshot(self.0.load(Acquire))
     }
 
-    pub fn fetch_update<F, E>(&self, mut f: F) -> Result<Snapshot, E>
-    where
-        F: FnMut(Snapshot) -> Result<Snapshot, E>,
-    {
+    pub fn fetch_update<E>(
+        &self,
+        mut f: impl FnMut(Snapshot) -> Result<Snapshot, E>,
+    ) -> Result<Snapshot, E> {
         let mut prev = self.load();
         loop {
             let next = f(prev)?;
@@ -64,19 +69,21 @@ impl State {
         Snapshot(self.0.fetch_or(COMPLETE, AcqRel))
     }
 
-    pub fn unset_join_interested(&self) -> UpdateResult {
-        self.fetch_update(|snapshot| {
+    /// Return `true` if the task is `COMPLETE`
+    pub fn unset_waker_and_interested(&self) -> bool {
+        self.fetch_update::<()>(|snapshot| {
             debug_assert!(snapshot.has(JOIN_INTEREST));
+            
             if snapshot.is(COMPLETE) {
                 return Err(());
             }
-            Ok(snapshot.remove(JOIN_INTEREST))
+            Ok(snapshot.remove(JOIN_INTEREST).remove(JOIN_WAKER))
         })
+        .is_err()
     }
 
-    pub fn set_join_waker(&self) -> UpdateResult {
+    pub fn set_waker(&self) -> UpdateResult {
         self.fetch_update(|snapshot| {
-            debug_assert!(snapshot.has(JOIN_INTEREST));
             debug_assert!(!snapshot.has(JOIN_WAKER));
 
             if snapshot.is(COMPLETE) {
@@ -88,7 +95,6 @@ impl State {
 
     pub fn unset_waker(&self) -> UpdateResult {
         self.fetch_update(|snapshot| {
-            debug_assert!(snapshot.has(JOIN_INTEREST));
             debug_assert!(snapshot.has(JOIN_WAKER));
 
             if snapshot.is(COMPLETE) {

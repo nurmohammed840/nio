@@ -1,10 +1,11 @@
-use crate::raw::{Header, RawTask, RawTaskVTable, Fut};
+use crate::raw::{Fut, Header, RawTask, RawTaskVTable};
 use crate::waker::NOOP_WAKER;
 use crate::{Id, JoinError, JoinHandle};
 
-use std::fmt;
+use std::panic::AssertUnwindSafe;
 use std::task::{Poll, Waker};
 use std::{cell::UnsafeCell, sync::Arc};
+use std::{fmt, panic};
 
 pub struct BlockingTask {
     raw_task: RawTask,
@@ -18,7 +19,7 @@ impl BlockingTask {
     {
         let raw_task = Arc::new(BlockingRawTask {
             header: Header::new(),
-            func: UnsafeCell::new(Fut::Running(f)),
+            func: UnsafeCell::new(Fut::Future(f)),
         });
         let join = JoinHandle::new(raw_task.clone());
         (BlockingTask { raw_task }, join)
@@ -54,25 +55,39 @@ where
         NOOP_WAKER
     }
 
-    unsafe fn drop_task_or_output(&self) {
-        *self.func.get() = Fut::Droped;
+    unsafe fn drop_join_handler(&self) {
+        let is_task_complete = self.header.state.unset_waker_and_interested();
+        if is_task_complete {
+            // If the task is complete then waker is droped by the executor.
+            // We just need to drop the output
+            let _ = panic::catch_unwind(AssertUnwindSafe(|| unsafe {
+                (*self.func.get()).drop();
+            }));
+        } else {
+            *self.header.join_waker.get() = None;
+        }
     }
 
     /// Panicking is acceptable here, as `BlockingTask` is only execute within the thread pool
     unsafe fn poll(&self, _: &Waker) -> bool {
         let output = match (*self.func.get()).take() {
-            Fut::Running(func) => func(),
+            Fut::Future(func) => func(),
             _ => unreachable!(),
         };
         (*self.func.get()).set_output(output);
-        if !self.header.transition_to_complete_and_notify_output_if_intrested() {
-            unsafe { self.drop_task_or_output() };
+        if !self
+            .header
+            .transition_to_complete_and_notify_output_if_intrested()
+        {
+            unsafe {
+                (*self.func.get()).drop();
+            };
         }
         false
     }
 
     unsafe fn read_output(&self, dst: *mut (), waker: &Waker) {
-        if self.header.can_read_output(waker) {
+        if self.header.can_read_output_or_notify_when_readable(waker) {
             *(dst as *mut _) = Poll::Ready(self.take_output());
         }
     }

@@ -52,7 +52,7 @@ impl Task {
     {
         let raw = Arc::new(RawTaskInner {
             header: Header::new(),
-            future: UnsafeCell::new(Fut::Running(future)),
+            future: UnsafeCell::new(Fut::Future(future)),
             scheduler,
         });
         let join_handle = JoinHandle::new(raw.clone());
@@ -103,14 +103,14 @@ where
     /// State transitions:
     ///
     /// ```markdown
-    /// [ NOTIFIED -> RUNNING -> SLEEP? ]+ -> COMPLETE?
+    /// NOTIFIED -> RUNNING -> ( SLEEP? -> NOTIFIED -> RUNNING )* -> COMPLETE?
     /// ```
     unsafe fn poll(&self, waker: &Waker) -> bool {
         if self.header.transition_to_running() {
             let action = panic::catch_unwind(AssertUnwindSafe(|| {
                 let poll_result = unsafe {
                     let fut = match &mut *self.future.get() {
-                        Fut::Running(fut) => Pin::new_unchecked(fut),
+                        Fut::Future(fut) => Pin::new_unchecked(fut),
                         _ => unreachable!(),
                     };
                     fut.poll(&mut Context::from_waker(waker))
@@ -119,15 +119,16 @@ where
                     Poll::Ready(val) => Fut::Result(Ok(val)),
                     Poll::Pending => match self.header.transition_to_sleep() {
                         PendingState::AbortOrComplete => Fut::Result(Err(JoinError::cancelled())),
-                        pending @ PendingState::Yielded(_) => return pending,
+                        pending => return pending,
                     },
                 };
+                // Droping future may panic, but we catch it in outer layer
                 unsafe { *self.future.get() = result }
                 PendingState::AbortOrComplete
             }));
 
             match action {
-                Ok(PendingState::Yielded(is_yielded)) => return is_yielded,
+                Ok(PendingState::YieldOrSleep(pending)) => return pending,
                 Ok(PendingState::AbortOrComplete) => {}
                 Err(panic_on_poll) => unsafe {
                     (*self.future.get()).set_err_output(JoinError::panic(panic_on_poll))
@@ -137,25 +138,36 @@ where
                 .header
                 .transition_to_complete_and_notify_output_if_intrested()
             {
-                let _ =
-                    panic::catch_unwind(AssertUnwindSafe(|| unsafe { self.drop_task_or_output() }));
+                // Droping `Fut::Result` may panic
+                let _ = panic::catch_unwind(AssertUnwindSafe(|| unsafe {
+                    (*self.future.get()).drop()
+                }));
             }
         }
         false
-    }
-
-    unsafe fn read_output(&self, dst: *mut (), waker: &Waker) {
-        if self.header.can_read_output(waker) {
-            *(dst as *mut _) = Poll::Ready(self.take_output());
-        }
     }
 
     unsafe fn schedule(self: Arc<Self>) {
         self.scheduler.clone().schedule(Task { raw_task: self });
     }
 
-    unsafe fn drop_task_or_output(&self) {
-        *self.future.get() = Fut::Droped
+    unsafe fn read_output(&self, dst: *mut (), waker: &Waker) {
+        if self.header.can_read_output_or_notify_when_readable(waker) {
+            *(dst as *mut _) = Poll::Ready(self.take_output());
+        }
+    }
+
+    unsafe fn drop_join_handler(&self) {
+        let is_task_complete = self.header.state.unset_waker_and_interested();
+        if is_task_complete {
+            // If the task is complete then waker is droped by the executor.
+            // We just need to drop the output
+            let _ = panic::catch_unwind(AssertUnwindSafe(|| unsafe {
+                (*self.future.get()).drop();
+            }));
+        } else {
+            *self.header.join_waker.get() = None;
+        }
     }
 
     unsafe fn abort_task(self: Arc<Self>) {
@@ -183,11 +195,6 @@ where
             raw_task: self.clone(),
         });
     }
-
-    // unsafe fn drop_task_and_set_err_output(&self) {
-    //     let panic_result = panic::catch_unwind(AssertUnwindSafe(|| self.drop_task_or_output()));
-    //     (*self.future.get()).set_err_output(JoinError::from(panic_result));
-    // }
 }
 
 impl<F, S> Wake for RawTaskInner<F, S>

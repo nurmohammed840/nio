@@ -48,23 +48,31 @@ struct Signal {
     signal: Condvar,
 }
 
-const ACTIVE: u8 = 0;
-const WAKE: u8 = 1;
+const RUNNING: u8 = 0;
+const NOTIFIED: u8 = 1;
 const SLEEP: u8 = 2;
 
 impl Signal {
-    // Case 1: ACTIVE -> SLEEP -> WAKE -> ACTIVE
-    // Case 2: ACTIVE -> WAKE -> ACTIVE
+    /// ```text
+    /// Case 1: RUNNING -> SLEEP -> NOTIFIED -> RUNNING
+    /// Case 2: RUNNING -> NOTIFIED -> RUNNING
+    /// ```
+    /// 
+    /// State transitions:
+    /// 
+    /// ```text
+    /// RUNNING -> (SLEEP? -> NOTIFIED -> RUNNING)+
+    /// ```
     fn wait_for_wakeup(&self) {
         let mut state = self.state.lock().unwrap();
-        if *state == WAKE {
-            *state = ACTIVE;
+        if *state == NOTIFIED {
+            *state = RUNNING;
         } else {
             *state = SLEEP;
             'spurious_wakeups: loop {
                 state = self.signal.wait(state).unwrap();
-                if *state == WAKE {
-                    *state = ACTIVE;
+                if *state == NOTIFIED {
+                    *state = RUNNING;
                     break 'spurious_wakeups;
                 }
             }
@@ -76,7 +84,7 @@ impl Wake for Signal {
     fn wake_by_ref(self: &Arc<Self>) {
         let old_state = {
             let mut state = self.state.lock().unwrap();
-            mem::replace(&mut *state, WAKE)
+            mem::replace(&mut *state, NOTIFIED)
         };
         if old_state == SLEEP {
             self.signal.notify_one();
