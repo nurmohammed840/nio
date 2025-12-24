@@ -15,26 +15,29 @@ pub enum PollStatus {
 }
 
 impl<F, T> Fut<F, T> {
-    pub(crate) fn take(&mut self) -> Self {
+    pub fn take(&mut self) -> Self {
         mem::replace(self, Self::Droped)
     }
 
-    pub(crate) fn drop(&mut self) {
+    pub fn drop(&mut self) {
         *self = Self::Droped;
     }
 
-    pub(crate) fn set_output(&mut self, value: T) {
-        *self = Self::Output(Ok(value));
+    pub fn set_output(&mut self, result: Result<T, JoinError>) {
+        *self = Self::Output(result);
     }
 
-    pub(crate) fn set_err_output(&mut self, error: JoinError) {
-        *self = Self::Output(Err(error));
+    pub fn take_output(&mut self) -> Result<T, JoinError> {
+        match self.take() {
+            Fut::Output(result) => result,
+            _ => panic!("JoinHandle polled after completion"),
+        }
     }
 }
 
-pub(crate) type RawTask = Arc<dyn RawTaskVTable>;
+pub type RawTask = Arc<dyn RawTaskVTable>;
 
-pub(crate) trait RawTaskVTable: Send + Sync {
+pub trait RawTaskVTable: Send + Sync {
     fn header(&self) -> &Header;
     fn waker(self: Arc<Self>) -> Waker;
 
@@ -42,15 +45,14 @@ pub(crate) trait RawTaskVTable: Send + Sync {
     unsafe fn schedule(self: Arc<Self>);
 
     unsafe fn abort_task(self: Arc<Self>);
-    unsafe fn drop_join_handler(&self);
-
     /// `dst: &mut Poll<Result<Future::Output, JoinError>>`
     unsafe fn read_output(&self, dst: *mut (), waker: &Waker);
+    unsafe fn drop_join_handler(&self);
 }
 
-pub(crate) struct Header {
-    pub(crate) state: State,
-    pub(crate) join_waker: UnsafeCell<Option<Waker>>,
+pub struct Header {
+    pub state: State,
+    pub join_waker: UnsafeCell<Option<Waker>>,
 }
 
 impl Header {

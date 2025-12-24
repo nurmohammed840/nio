@@ -40,7 +40,7 @@ struct RawTaskInner<F: Future, S: Scheduler> {
 unsafe impl<F: Future, S: Scheduler> Sync for RawTaskInner<F, S> {}
 
 pub struct Task {
-    raw_task: RawTask,
+    raw: RawTask,
 }
 
 pub enum Status {
@@ -62,18 +62,18 @@ impl Task {
             scheduler,
         });
         let join_handle = JoinHandle::new(raw.clone());
-        (Self { raw_task: raw }, join_handle)
+        (Self { raw }, join_handle)
     }
 
     #[inline]
     pub fn poll(self) -> Status {
         // Don't increase ref-counter
-        let raw_task = unsafe { Arc::from_raw(Arc::as_ptr(&self.raw_task)) };
+        let raw = unsafe { Arc::from_raw(Arc::as_ptr(&self.raw)) };
         // Don't decrease ref-counter
-        let waker = ManuallyDrop::new(raw_task.waker());
+        let waker = ManuallyDrop::new(raw.waker());
 
         // SAFETY: `Task` does not implement `Clone` and we have owned access
-        match unsafe { self.raw_task.poll(&waker) } {
+        match unsafe { self.raw.poll(&waker) } {
             PollStatus::Yield => Status::Yielded(self),
             PollStatus::Pending => Status::Pending,
             PollStatus::Complete => Status::Complete,
@@ -82,12 +82,12 @@ impl Task {
 
     #[inline]
     pub fn schedule(self) {
-        unsafe { self.raw_task.schedule() }
+        unsafe { self.raw.schedule() }
     }
 
     #[inline]
     pub fn id(&self) -> Id {
-        Id::new(&self.raw_task)
+        Id::new(&self.raw)
     }
 }
 
@@ -125,24 +125,27 @@ where
                 fut.poll(&mut Context::from_waker(waker))
             };
             let result = match poll_result {
-                Poll::Ready(val) => Fut::Output(Ok(val)),
-                Poll::Pending if is_cancelled => Fut::Output(Err(JoinError::cancelled())),
+                Poll::Ready(val) => Ok(val),
+                Poll::Pending if is_cancelled => Err(JoinError::cancelled()),
                 Poll::Pending => return false,
             };
             // Droping `Fut::Future` may also panic, but we catch it in outer layer
-            unsafe { *self.future.get() = result }
+            unsafe {
+                (*self.future.get()).set_output(result);
+            }
             true
         }));
 
         match has_output {
             Ok(false) => return self.header.transition_to_sleep(),
             Ok(true) => {}
-            Err(err) => unsafe { (*self.future.get()).set_err_output(JoinError::panic(err)) },
+            Err(err) => unsafe { (*self.future.get()).set_output(Err(JoinError::panic(err))) },
         }
         if !self
             .header
             .transition_to_complete_and_notify_output_if_intrested()
         {
+            // Receiver is not interested in the output, So we can drop it.
             // Droping `Fut::Output` may panic
             let _ = catch_unwind(AssertUnwindSafe(|| unsafe { (*self.future.get()).drop() }));
         }
@@ -150,12 +153,18 @@ where
     }
 
     unsafe fn schedule(self: Arc<Self>) {
-        self.scheduler.clone().schedule(Task { raw_task: self });
+        self.scheduler.clone().schedule(Task { raw: self });
     }
 
+    unsafe fn abort_task(self: Arc<Self>) {
+        if self.header.transition_to_abort() {
+            self.schedule()
+        }
+    }
+    
     unsafe fn read_output(&self, dst: *mut (), waker: &Waker) {
         if self.header.can_read_output_or_notify_when_readable(waker) {
-            *(dst as *mut _) = Poll::Ready(self.take_output());
+            *(dst as *mut _) = Poll::Ready((*self.future.get()).take_output());
         }
     }
 
@@ -171,12 +180,6 @@ where
             *self.header.join_waker.get() = None;
         }
     }
-
-    unsafe fn abort_task(self: Arc<Self>) {
-        if self.header.transition_to_abort() {
-            self.schedule()
-        }
-    }
 }
 
 impl<F, S> RawTaskInner<F, S>
@@ -185,17 +188,8 @@ where
     F::Output: Send,
     S: Scheduler,
 {
-    unsafe fn take_output(&self) -> Result<F::Output, JoinError> {
-        match (*self.future.get()).take() {
-            Fut::Output(result) => result,
-            _ => panic!("JoinHandle polled after completion"),
-        }
-    }
-
     unsafe fn schedule_by_ref(self: &Arc<Self>) {
-        self.scheduler.schedule(Task {
-            raw_task: self.clone(),
-        });
+        self.scheduler.schedule(Task { raw: self.clone() });
     }
 }
 
@@ -226,7 +220,7 @@ impl fmt::Debug for Task {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Task")
             .field("id", &self.id())
-            .field("state", &self.raw_task.header().state.load())
+            .field("state", &self.raw.header().state.load())
             .finish()
     }
 }
