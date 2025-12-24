@@ -24,18 +24,12 @@ impl<T> JoinHandle<T> {
         }
     }
 
-    pub fn abort(mut self) {
-        self.drop_join_handler();
+    pub fn abort(self) {
         unsafe { self.raw.clone().abort_task() };
     }
 
-    fn drop_join_handler(&mut self) {
-        unsafe { self.raw.drop_join_handler() };
-    }
-
     pub fn is_finished(&self) -> bool {
-        let state = self.raw.header().state.load();
-        state.is(COMPLETE)
+        self.raw.header().state.load().has(COMPLETE)
     }
 
     pub fn id(&self) -> Id {
@@ -61,7 +55,7 @@ impl<T> Future for JoinHandle<T> {
 
 impl<T> Drop for JoinHandle<T> {
     fn drop(&mut self) {
-        self.drop_join_handler();
+        unsafe { self.raw.drop_join_handler() };
     }
 }
 

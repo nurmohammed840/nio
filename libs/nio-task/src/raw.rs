@@ -4,14 +4,14 @@ use std::{cell::UnsafeCell, mem, sync::Arc, task::Waker};
 #[repr(C)] // https://github.com/rust-lang/miri/issues/3780
 pub enum Fut<F, T> {
     Future(F),
-    Result(Result<T, JoinError>),
+    Output(Result<T, JoinError>),
     Droped,
 }
 
-pub enum PendingState {
-    /// `false` if task is sleeping
-    YieldOrSleep(bool),
-    AbortOrComplete,
+pub enum PollStatus {
+    Yield,
+    Pending,
+    Complete,
 }
 
 impl<F, T> Fut<F, T> {
@@ -24,11 +24,11 @@ impl<F, T> Fut<F, T> {
     }
 
     pub(crate) fn set_output(&mut self, value: T) {
-        *self = Self::Result(Ok(value));
+        *self = Self::Output(Ok(value));
     }
 
     pub(crate) fn set_err_output(&mut self, error: JoinError) {
-        *self = Self::Result(Err(error));
+        *self = Self::Output(Err(error));
     }
 }
 
@@ -38,7 +38,7 @@ pub(crate) trait RawTaskVTable: Send + Sync {
     fn header(&self) -> &Header;
     fn waker(self: Arc<Self>) -> Waker;
 
-    unsafe fn poll(&self, waker: &Waker) -> bool;
+    unsafe fn poll(&self, waker: &Waker) -> PollStatus;
     unsafe fn schedule(self: Arc<Self>);
 
     unsafe fn abort_task(self: Arc<Self>);
@@ -61,37 +61,64 @@ impl Header {
         }
     }
 
+    /// After calling this function, executor have exclusive access to poll the future.
+    /// Until [`Header::transition_to_sleep`] is called.
+    ///
     /// `NOTIFIED -> RUNNING`
-    pub fn transition_to_running(&self) -> bool {
-        self.state
-            .fetch_update(|snapshot| {
-                let state = snapshot.get();
-                if state == NOTIFIED {
-                    return Ok(snapshot.set(RUNNING));
-                }
-                debug_assert!(state == COMPLETE, "invalid task state: {snapshot:?}");
-                Err(())
-            })
-            .is_ok()
+    pub fn transition_to_running_and_check_if_cancelled(&self) -> bool {
+        let state = self.state.set_running();
+        debug_assert!(state.is(NOTIFIED), "invalid task state: {state:?}");
+        debug_assert!(!state.has(COMPLETE), "poll after complete: {state:?}");
+        state.has(CANCELLED)
+    }
+
+    /// Returns [`PollStatus::Yield`] if the future NOTIFIED while in the `RUNNING` state.
+    /// for example: `yield_now().await`
+    ///
+    /// After this call, the executor **MUST NOT** access the future field.
+    ///
+    /// `RUNNING -> SLEEP`
+    pub fn transition_to_sleep(&self) -> PollStatus {
+        let state = self.state.set_running_to_sleep();
+        if state.is(RUNNING) {
+            return PollStatus::Pending;
+        }
+        debug_assert!(state.is(NOTIFIED), "invalid task state: {state:?}");
+        PollStatus::Yield
+    }
+
+    /// `(RUNNING | SLEEP) -> NOTIFIED`
+    ///
+    /// Return `true` if the task is in `SLEEP` state,
+    pub fn transition_to_notified(&self) -> bool {
+        // Completed task is always in `RUNNING` state, so no additional
+        // check is required here.
+        self.state.set_notified().is(SLEEP)
+    }
+
+    /// `(RUNNING | SLEEP) -> NOTIFIED`
+    ///
+    /// Return `true` if the task is in `SLEEP` state
+    pub fn transition_to_abort(&self) -> bool {
+        self.state.set_notified_with_cancelled_flag().is(SLEEP)
     }
 
     /// If this function return `false`, then the caller is responsible to drop the output.
     ///
     /// `COMPLETE`
     pub fn transition_to_complete_and_notify_output_if_intrested(&self) -> bool {
-        let snapshot = self.state.set_complete();
-        let state = snapshot.get();
+        let state = self.state.set_complete();
 
         debug_assert!(
-            state == RUNNING || state == NOTIFIED,
-            "invalid task state: {snapshot:?}"
+            state.is(RUNNING) || state.is(NOTIFIED),
+            "invalid task state: {state:?}"
         );
-        if !snapshot.has(JOIN_INTEREST) {
+        if !state.has(JOIN_INTEREST) {
             // The `JoinHandle` is not interested in the output of this task.
             // It is our responsibility to drop the output.
             return false;
         }
-        if snapshot.has(JOIN_WAKER) {
+        if state.has(JOIN_WAKER) {
             match unsafe { (*self.join_waker.get()).take() } {
                 Some(waker) => waker.wake(),
                 None => panic!("waker missing"),
@@ -100,64 +127,14 @@ impl Header {
         true
     }
 
-    /// Returns `PendingState::Yielded(true)` if the future waken (`NOTIFIED`)
-    /// while in the `RUNNING` state. via `yield_now().await`
-    ///
-    /// `RUNNING -> SLEEP`
-    pub fn transition_to_sleep(&self) -> PendingState {
-        let op = self.state.fetch_update(|snapshot| {
-            let state = snapshot.get();
-            if state == RUNNING {
-                return Ok(snapshot.set(SLEEP));
-            }
-
-            if snapshot.has(CANCELLED) {
-                return Err(PendingState::AbortOrComplete);
-            }
-
-            debug_assert!(state == NOTIFIED, "invalid task state: {snapshot:?}");
-            Err(PendingState::YieldOrSleep(true))
-        });
-        match op {
-            Ok(_) => PendingState::YieldOrSleep(false),
-            Err(state) => state,
-        }
-    }
-
-    /// `(RUNNING | SLEEP) -> NOTIFIED`
-    ///
-    /// Return `true` if the task is in `SLEEP` state
-    pub fn transition_to_wake(&self) -> bool {
-        let op = self.state.fetch_update(|snapshot| {
-            let state = snapshot.get();
-            if state == RUNNING || state == SLEEP {
-                return Ok(snapshot.set(NOTIFIED));
-            }
-            Err(())
-        });
-        op.is_ok_and(|s| s.is(SLEEP))
-    }
-
-    /// Return `true` if the task is in `SLEEP` state
-    pub fn transition_to_abort(&self) -> bool {
-        let op = self.state.fetch_update(|snapshot: Snapshot| {
-            let state = snapshot.get();
-            if state == RUNNING || state == SLEEP {
-                return Ok(snapshot.with(CANCELLED).set(NOTIFIED));
-            }
-            Err(())
-        });
-        op.is_ok_and(|s| s.is(SLEEP))
-    }
-
     pub fn can_read_output_or_notify_when_readable(&self, waker: &Waker) -> bool {
-        let snapshot = self.state.load();
-        debug_assert!(snapshot.has(JOIN_INTEREST));
+        let state = self.state.load();
+        debug_assert!(state.has(JOIN_INTEREST));
 
-        if snapshot.is(COMPLETE) {
+        if state.has(COMPLETE) {
             return true;
         }
-        let res = if !snapshot.has(JOIN_WAKER) {
+        let res = if !state.has(JOIN_WAKER) {
             // the task is not complete, try storing the provided waker in the task's waker field.
             // SAFETY: `JOIN_WAKER` is not set, see docs of `JOIN_WAKER` flag.
             unsafe { self.set_join_waker(waker.clone()) }

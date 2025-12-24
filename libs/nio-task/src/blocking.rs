@@ -1,4 +1,4 @@
-use crate::raw::{Fut, Header, RawTask, RawTaskVTable};
+use crate::raw::{Fut, Header, PollStatus, RawTask, RawTaskVTable};
 use crate::waker::NOOP_WAKER;
 use crate::{Id, JoinError, JoinHandle};
 
@@ -69,7 +69,7 @@ where
     }
 
     /// Panicking is acceptable here, as `BlockingTask` is only execute within the thread pool
-    unsafe fn poll(&self, _: &Waker) -> bool {
+    unsafe fn poll(&self, _: &Waker) -> PollStatus {
         let output = match (*self.func.get()).take() {
             Fut::Future(func) => func(),
             _ => unreachable!(),
@@ -83,7 +83,7 @@ where
                 (*self.func.get()).drop();
             };
         }
-        false
+        PollStatus::Complete
     }
 
     unsafe fn read_output(&self, dst: *mut (), waker: &Waker) {
@@ -104,7 +104,7 @@ where
 {
     unsafe fn take_output(&self) -> Result<F::Output, JoinError> {
         match (*self.func.get()).take() {
-            Fut::Result(output) => output,
+            Fut::Output(result) => result,
             _ => panic!("JoinHandle polled after completion"),
         }
     }

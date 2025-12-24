@@ -21,7 +21,7 @@ use std::{
     fmt,
     future::Future,
     mem::ManuallyDrop,
-    panic::{self, AssertUnwindSafe},
+    panic::{AssertUnwindSafe, catch_unwind},
     pin::Pin,
     sync::Arc,
     task::{Context, Poll, Wake, Waker},
@@ -43,6 +43,12 @@ pub struct Task {
     raw_task: RawTask,
 }
 
+pub enum Status {
+    Yielded(Task),
+    Pending,
+    Complete,
+}
+
 impl Task {
     pub fn new<F, S>(future: F, scheduler: S) -> (Self, JoinHandle<F::Output>)
     where
@@ -60,17 +66,18 @@ impl Task {
     }
 
     #[inline]
-    pub fn poll(self) -> Option<Self> {
+    pub fn poll(self) -> Status {
         // Don't increase ref-counter
         let raw_task = unsafe { Arc::from_raw(Arc::as_ptr(&self.raw_task)) };
         // Don't decrease ref-counter
         let waker = ManuallyDrop::new(raw_task.waker());
 
         // SAFETY: `Task` does not implement `Clone` and we have owned access
-        if unsafe { self.raw_task.poll(&waker) } {
-            return Some(self);
+        match unsafe { self.raw_task.poll(&waker) } {
+            PollStatus::Yield => Status::Yielded(self),
+            PollStatus::Pending => Status::Pending,
+            PollStatus::Complete => Status::Complete,
         }
-        None
     }
 
     #[inline]
@@ -105,46 +112,41 @@ where
     /// ```markdown
     /// NOTIFIED -> RUNNING -> ( SLEEP? -> NOTIFIED -> RUNNING )* -> COMPLETE?
     /// ```
-    unsafe fn poll(&self, waker: &Waker) -> bool {
-        if self.header.transition_to_running() {
-            let action = panic::catch_unwind(AssertUnwindSafe(|| {
-                let poll_result = unsafe {
-                    let fut = match &mut *self.future.get() {
-                        Fut::Future(fut) => Pin::new_unchecked(fut),
-                        _ => unreachable!(),
-                    };
-                    fut.poll(&mut Context::from_waker(waker))
-                };
-                let result = match poll_result {
-                    Poll::Ready(val) => Fut::Result(Ok(val)),
-                    Poll::Pending => match self.header.transition_to_sleep() {
-                        PendingState::AbortOrComplete => Fut::Result(Err(JoinError::cancelled())),
-                        pending => return pending,
-                    },
-                };
-                // Droping future may panic, but we catch it in outer layer
-                unsafe { *self.future.get() = result }
-                PendingState::AbortOrComplete
-            }));
+    unsafe fn poll(&self, waker: &Waker) -> PollStatus {
+        let is_cancelled = self.header.transition_to_running_and_check_if_cancelled();
 
-            match action {
-                Ok(PendingState::YieldOrSleep(pending)) => return pending,
-                Ok(PendingState::AbortOrComplete) => {}
-                Err(panic_on_poll) => unsafe {
-                    (*self.future.get()).set_err_output(JoinError::panic(panic_on_poll))
-                },
-            }
-            if !self
-                .header
-                .transition_to_complete_and_notify_output_if_intrested()
-            {
-                // Droping `Fut::Result` may panic
-                let _ = panic::catch_unwind(AssertUnwindSafe(|| unsafe {
-                    (*self.future.get()).drop()
-                }));
-            }
+        let has_output = catch_unwind(AssertUnwindSafe(|| {
+            let poll_result = unsafe {
+                let fut = match &mut *self.future.get() {
+                    Fut::Future(fut) => Pin::new_unchecked(fut),
+                    _ => unreachable!(),
+                };
+                // Polling may panic, but we catch it in outer layer.
+                fut.poll(&mut Context::from_waker(waker))
+            };
+            let result = match poll_result {
+                Poll::Ready(val) => Fut::Output(Ok(val)),
+                Poll::Pending if is_cancelled => Fut::Output(Err(JoinError::cancelled())),
+                Poll::Pending => return false,
+            };
+            // Droping `Fut::Future` may also panic, but we catch it in outer layer
+            unsafe { *self.future.get() = result }
+            true
+        }));
+
+        match has_output {
+            Ok(false) => return self.header.transition_to_sleep(),
+            Ok(true) => {}
+            Err(err) => unsafe { (*self.future.get()).set_err_output(JoinError::panic(err)) },
         }
-        false
+        if !self
+            .header
+            .transition_to_complete_and_notify_output_if_intrested()
+        {
+            // Droping `Fut::Output` may panic
+            let _ = catch_unwind(AssertUnwindSafe(|| unsafe { (*self.future.get()).drop() }));
+        }
+        PollStatus::Complete
     }
 
     unsafe fn schedule(self: Arc<Self>) {
@@ -161,8 +163,8 @@ where
         let is_task_complete = self.header.state.unset_waker_and_interested();
         if is_task_complete {
             // If the task is complete then waker is droped by the executor.
-            // We just need to drop the output
-            let _ = panic::catch_unwind(AssertUnwindSafe(|| unsafe {
+            // We just only need to drop the output.
+            let _ = catch_unwind(AssertUnwindSafe(|| unsafe {
                 (*self.future.get()).drop();
             }));
         } else {
@@ -185,7 +187,7 @@ where
 {
     unsafe fn take_output(&self) -> Result<F::Output, JoinError> {
         match (*self.future.get()).take() {
-            Fut::Result(output) => output,
+            Fut::Output(result) => result,
             _ => panic!("JoinHandle polled after completion"),
         }
     }
@@ -205,7 +207,7 @@ where
 {
     fn wake(self: Arc<Self>) {
         unsafe {
-            if self.header.transition_to_wake() {
+            if self.header.transition_to_notified() {
                 self.schedule();
             }
         }
@@ -213,7 +215,7 @@ where
 
     fn wake_by_ref(self: &Arc<Self>) {
         unsafe {
-            if self.header.transition_to_wake() {
+            if self.header.transition_to_notified() {
                 self.schedule_by_ref();
             }
         }
