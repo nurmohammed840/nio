@@ -16,6 +16,9 @@ pub struct JoinHandle<T> {
 unsafe impl<T: Send> Send for JoinHandle<T> {}
 unsafe impl<T: Send> Sync for JoinHandle<T> {}
 
+impl<T> std::panic::UnwindSafe for JoinHandle<T> {}
+impl<T> std::panic::RefUnwindSafe for JoinHandle<T> {}
+
 impl<T> JoinHandle<T> {
     pub(super) fn new(raw: RawTask) -> JoinHandle<T> {
         JoinHandle {
@@ -24,7 +27,7 @@ impl<T> JoinHandle<T> {
         }
     }
 
-    pub fn abort(self) {
+    pub fn abort(&self) {
         unsafe { self.raw.clone().abort_task() };
     }
 

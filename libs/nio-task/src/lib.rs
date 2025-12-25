@@ -27,8 +27,17 @@ use std::{
     task::{Context, Poll, Wake, Waker},
 };
 
-pub trait Scheduler: Clone + Send + 'static {
+pub trait Scheduler: Send + 'static {
     fn schedule(&self, task: Task);
+}
+
+impl<F> Scheduler for F
+where
+    F: Fn(Task) + Send + 'static,
+{
+    fn schedule(&self, runnable: Task) {
+        self(runnable)
+    }
 }
 
 struct RawTaskInner<F: Future, S: Scheduler> {
@@ -42,6 +51,9 @@ unsafe impl<F: Future, S: Scheduler> Sync for RawTaskInner<F, S> {}
 pub struct Task {
     raw: RawTask,
 }
+
+impl std::panic::UnwindSafe for Task {}
+impl std::panic::RefUnwindSafe for Task {}
 
 pub enum Status {
     Yielded(Task),
@@ -153,7 +165,7 @@ where
     }
 
     unsafe fn schedule(self: Arc<Self>) {
-        self.scheduler.clone().schedule(Task { raw: self });
+        self.scheduler.schedule(Task { raw: self.clone() });
     }
 
     unsafe fn abort_task(self: Arc<Self>) {
@@ -161,7 +173,7 @@ where
             self.schedule()
         }
     }
-    
+
     unsafe fn read_output(&self, dst: *mut (), waker: &Waker) {
         if self.header.can_read_output_or_notify_when_readable(waker) {
             *(dst as *mut _) = Poll::Ready((*self.future.get()).take_output());
