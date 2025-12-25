@@ -11,6 +11,9 @@ pub struct BlockingTask {
     raw: RawTask,
 }
 
+unsafe impl Send for BlockingTask {}
+unsafe impl Sync for BlockingTask {}
+
 impl BlockingTask {
     pub fn new<F, T>(f: F) -> (BlockingTask, JoinHandle<T>)
     where

@@ -52,6 +52,9 @@ pub struct Task {
     raw: RawTask,
 }
 
+unsafe impl Send for Task {}
+unsafe impl Sync for Task {}
+
 impl std::panic::UnwindSafe for Task {}
 impl std::panic::RefUnwindSafe for Task {}
 
@@ -66,6 +69,21 @@ impl Task {
     where
         F: Future + Send + 'static,
         F::Output: Send,
+        S: Scheduler,
+    {
+        let raw = Arc::new(RawTaskInner {
+            header: Header::new(),
+            future: UnsafeCell::new(Fut::Future(future)),
+            scheduler,
+        });
+        let join_handle = JoinHandle::new(raw.clone());
+        (Self { raw }, join_handle)
+    }
+
+    pub fn new_local<F, S>(future: F, scheduler: S) -> (Self, JoinHandle<F::Output>)
+    where
+        F: Future + 'static,
+        F::Output: 'static,
         S: Scheduler,
     {
         let raw = Arc::new(RawTaskInner {
@@ -105,13 +123,13 @@ impl Task {
 
 impl<F, S> RawTaskVTable for RawTaskInner<F, S>
 where
-    F: Future + Send + 'static,
-    F::Output: Send,
+    F: Future + 'static,
     S: Scheduler,
 {
     #[inline]
     fn waker(self: Arc<Self>) -> Waker {
-        Waker::from(self)
+        // Waker::from(self)
+        todo!()
     }
 
     #[inline]
@@ -196,8 +214,7 @@ where
 
 impl<F, S> RawTaskInner<F, S>
 where
-    F: Future + Send + 'static,
-    F::Output: Send,
+    F: Future + 'static,
     S: Scheduler,
 {
     unsafe fn schedule_by_ref(self: &Arc<Self>) {
@@ -207,8 +224,7 @@ where
 
 impl<F, S> Wake for RawTaskInner<F, S>
 where
-    F: Future + Send + 'static,
-    F::Output: Send,
+    F: Future + 'static,
     S: Scheduler,
 {
     fn wake(self: Arc<Self>) {

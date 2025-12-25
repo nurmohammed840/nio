@@ -37,7 +37,7 @@ impl<F, T> Fut<F, T> {
 
 pub type RawTask = Arc<dyn RawTaskVTable>;
 
-pub trait RawTaskVTable: Send + Sync {
+pub trait RawTaskVTable {
     fn header(&self) -> &Header;
     fn waker(self: Arc<Self>) -> Waker;
 
