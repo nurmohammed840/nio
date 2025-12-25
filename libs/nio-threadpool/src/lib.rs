@@ -101,7 +101,7 @@ impl<Task: Runnable> ThreadPool<Task> {
         }
 
         let b = thread_builder(&self);
-        self.spawn(b).expect("failed to spawn worker thread");
+        self.spawn(b).expect("failed to spawn a thread in thread pool");
     }
 
     pub fn spawn(&self, thread_builder: thread::Builder) -> io::Result<thread::JoinHandle<()>> {

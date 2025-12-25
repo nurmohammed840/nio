@@ -1,16 +1,16 @@
 mod blocking;
 pub mod rt;
 
-
 use std::time::Duration;
 
 pub struct RuntimeConfig {
     worker_threads: usize,
+    worker_stack_size: Option<usize>,
     worker_name: Box<dyn Fn(usize) -> String>,
 
     max_blocking_threads: u16,
     thread_stack_size: usize,
-    thread_name: Box<dyn Fn(usize) -> String>,
+    thread_name: Option<Box<dyn Fn(usize) -> String>>,
     thread_timeout: Option<Duration>,
 }
 
@@ -21,10 +21,11 @@ impl Default for RuntimeConfig {
                 .map(|nthread| nthread.get())
                 .unwrap_or(1),
 
+            worker_stack_size: None,
             thread_stack_size: 0,
             max_blocking_threads: 512,
             thread_timeout: Some(Duration::from_secs(10)),
-            thread_name: Box::new(|id| format!("Thread: {id}")),
+            thread_name: Some(Box::new(|id| format!("Thread: {id}"))),
             worker_name: Box::new(|id| format!("Worker: {id}")),
         }
     }
@@ -37,6 +38,12 @@ impl RuntimeConfig {
 
     pub fn worker_threads(mut self, val: usize) -> Self {
         self.worker_threads = val;
+        self
+    }
+
+    pub fn worker_stack_size(mut self, size: usize) -> Self {
+        assert!(size > 0);
+        self.worker_stack_size = Some(size);
         self
     }
 
@@ -59,7 +66,7 @@ impl RuntimeConfig {
     where
         F: Fn(usize) -> String + 'static,
     {
-        self.thread_name = Box::new(f);
+        self.thread_name = Some(Box::new(f));
         self
     }
 
