@@ -10,7 +10,7 @@ pub struct ThreadPool<Task: Runnable> {
     max_threads_limit: u16,
     timeout: Option<Duration>,
     stack_size: usize,
-    name: Box<dyn Fn(usize) -> String>,
+    name: Box<dyn Fn(usize) -> String + Send + Sync>,
 }
 
 impl<T: Runnable> Default for ThreadPool<T> {
@@ -54,7 +54,7 @@ impl<Task: Runnable> ThreadPool<Task> {
 
     pub fn name<F>(mut self, f: F) -> Self
     where
-        F: Fn(usize) -> String + 'static,
+        F: Fn(usize) -> String + 'static + Send + Sync,
     {
         self.name = Box::new(f);
         self
@@ -101,7 +101,8 @@ impl<Task: Runnable> ThreadPool<Task> {
         }
 
         let b = thread_builder(&self);
-        self.spawn(b).expect("failed to spawn a thread in thread pool");
+        self.spawn(b)
+            .expect("failed to spawn a thread in thread pool");
     }
 
     pub fn spawn(&self, thread_builder: thread::Builder) -> io::Result<thread::JoinHandle<()>> {

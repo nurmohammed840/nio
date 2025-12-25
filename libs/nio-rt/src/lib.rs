@@ -4,13 +4,13 @@ pub mod rt;
 use std::time::Duration;
 
 pub struct RuntimeConfig {
-    worker_threads: usize,
+    worker_threads: u8,
     worker_stack_size: Option<usize>,
-    worker_name: Box<dyn Fn(usize) -> String>,
+    worker_name: Box<dyn Fn(u8) -> String>,
 
     max_blocking_threads: u16,
     thread_stack_size: usize,
-    thread_name: Option<Box<dyn Fn(usize) -> String>>,
+    thread_name: Option<Box<dyn Fn(usize) -> String + Send + Sync>>,
     thread_timeout: Option<Duration>,
 }
 
@@ -19,7 +19,9 @@ impl Default for RuntimeConfig {
         Self {
             worker_threads: std::thread::available_parallelism()
                 .map(|nthread| nthread.get())
-                .unwrap_or(1),
+                .unwrap_or(1)
+                .try_into()
+                .unwrap(),
 
             worker_stack_size: None,
             thread_stack_size: 0,
@@ -36,7 +38,8 @@ impl RuntimeConfig {
         Self::default()
     }
 
-    pub fn worker_threads(mut self, val: usize) -> Self {
+    pub fn worker_threads(mut self, val: u8) -> Self {
+        assert!(val > 0);
         self.worker_threads = val;
         self
     }
@@ -64,7 +67,7 @@ impl RuntimeConfig {
 
     pub fn thread_name<F>(mut self, f: F) -> Self
     where
-        F: Fn(usize) -> String + 'static,
+        F: Fn(usize) -> String + 'static + Send + Sync,
     {
         self.thread_name = Some(Box::new(f));
         self
@@ -72,7 +75,7 @@ impl RuntimeConfig {
 
     pub fn worker_name<F>(mut self, f: F) -> Self
     where
-        F: Fn(usize) -> String + 'static,
+        F: Fn(u8) -> String + 'static,
     {
         self.worker_name = Box::new(f);
         self
