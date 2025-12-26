@@ -1,6 +1,7 @@
 #![allow(unused)]
 mod context;
 mod local_context;
+mod task;
 mod task_counter;
 mod worker;
 
@@ -15,7 +16,7 @@ use worker::Worker;
 impl RuntimeConfig {
     pub fn rt(mut self) -> Runtime {
         let context = Arc::new(RuntimeContext {
-            workers: (0..self.worker_threads).map(|_| Worker::new()).collect(),
+            workers: (0..self.worker_threads).map(Worker::new).collect(),
             threadpool: ThreadPool::new()
                 .max_threads_limit(self.max_blocking_threads)
                 .stack_size(self.thread_stack_size)

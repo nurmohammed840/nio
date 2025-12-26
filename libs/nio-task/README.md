@@ -1,6 +1,6 @@
 ## Example
 
-```
+```rust
 use nio_task::{Status, Task};
 
 let future = async {};

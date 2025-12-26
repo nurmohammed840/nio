@@ -2,19 +2,21 @@ use super::*;
 use std::sync::Arc;
 
 use crossbeam_queue::SegQueue;
-use nio_task::{Status, Task};
 
 use local_context::LocalContext;
+use task::{Status, Task};
 use task_counter::TaskCounter;
 
 pub struct Worker {
+    pub id: u8,
     pub task_counter: TaskCounter,
     pub shared_queue: SegQueue<Task>,
 }
 
 impl Worker {
-    pub fn new() -> Self {
+    pub fn new(id: u8) -> Self {
         Self {
+            id,
             task_counter: TaskCounter::new(),
             shared_queue: SegQueue::new(),
         }

@@ -1,6 +1,6 @@
 use super::*;
-use nio_task::Task;
 use std::{cell::UnsafeCell, collections::VecDeque, rc::Rc};
+use task::Task;
 use task_counter::Counter;
 
 thread_local! {
