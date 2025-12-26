@@ -11,12 +11,12 @@ use std::{sync::Arc, thread};
 use nio_threadpool::ThreadPool;
 
 use context::RuntimeContext;
-use worker::Worker;
+use worker::Workers;
 
 impl RuntimeConfig {
     pub fn rt(mut self) -> Runtime {
         let context = Arc::new(RuntimeContext {
-            workers: (0..self.worker_threads).map(Worker::new).collect(),
+            workers: Workers::new(self.worker_threads),
             threadpool: ThreadPool::new()
                 .max_threads_limit(self.max_blocking_threads)
                 .stack_size(self.thread_stack_size)
@@ -53,11 +53,11 @@ impl Runtime {
         for id in 1..self.config.worker_threads {
             let runtime = self.context.clone();
             self.create_thread(id)
-                .spawn(move || Worker::job(id, event_interval, runtime))
+                .spawn(move || Workers::job(id, event_interval, runtime))
                 .expect(&format!("failed to spawn worker thread: {id}"));
         }
         drop(self.config);
 
-        Worker::job(0, event_interval, self.context)
+        Workers::job(0, event_interval, self.context)
     }
 }

@@ -7,18 +7,27 @@ use local_context::LocalContext;
 use task::{Status, Task};
 use task_counter::TaskCounter;
 
-pub struct Worker {
-    pub id: u8,
-    pub task_counter: TaskCounter,
-    pub shared_queue: SegQueue<Task>,
+pub type SharedQueue = SegQueue<Task>;
+
+pub struct Workers {
+    pub task_counters: Box<[TaskCounter]>,
+    pub shared_queues: Box<[SharedQueue]>,
 }
 
-impl Worker {
-    pub fn new(id: u8) -> Self {
+impl Workers {
+    pub fn least_loaded_worker_index(&self) -> usize {
+        // Safety: `task_counters` is not empty
+        unsafe {
+            crate::utils::min_index_by_key(&self.task_counters, |counter| counter.load().total())
+        }
+    }
+}
+
+impl Workers {
+    pub fn new(count: u8) -> Self {
         Self {
-            id,
-            task_counter: TaskCounter::new(),
-            shared_queue: SegQueue::new(),
+            task_counters: (0..count).map(|_| TaskCounter::new()).collect(),
+            shared_queues: (0..count).map(|_| SegQueue::new()).collect(),
         }
     }
 
@@ -26,7 +35,7 @@ impl Worker {
         let context = LocalContext::new(id, 512, runtime_ctx);
         context.clone().init();
 
-        let worker = context.current();
+        let task_counter = context.task_counter();
 
         let mut tick = Tick(tick);
         while !tick.is_complete() {
@@ -37,12 +46,12 @@ impl Worker {
                     }
                     Status::Pending | Status::Complete(_) => {
                         tick.step();
-                        let counter = worker.task_counter.decrease_local();
+                        let counter = task_counter.decrease_local();
                         unsafe { context.move_tasks_from_shared_to_local_queue(counter) };
                     }
                 },
                 None => {
-                    let counter = worker.task_counter.load();
+                    let counter = task_counter.load();
                     if counter.shared_queue_has_data() {
                         unsafe { context.move_tasks_from_shared_to_local_queue(counter) };
                     } else {

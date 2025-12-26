@@ -1,8 +1,9 @@
 use super::*;
 use task::*;
+use worker::SharedQueue;
 
 pub struct RuntimeContext {
-    pub(crate) workers: Box<[Worker]>,
+    pub(crate) workers: Workers,
     pub(crate) threadpool: ThreadPool<BlockingTask>,
 }
 
@@ -27,9 +28,11 @@ impl RuntimeContext {
                 kind: TaskKind::Sendable,
             },
             future,
-            |_| {},
+            Scheduler,
         );
-        self.workers[0].shared_queue.push(task);
+        let index = self.workers.least_loaded_worker_index();
+        self.workers.shared_queues[index].push(task);
+        self.workers.task_counters[index].increase_shared();
         join
     }
 
@@ -39,7 +42,7 @@ impl RuntimeContext {
         Fut: Future + 'static,
         Fut::Output: 'static,
     {
-        spawn_pinned_at(&self.workers[worker_id as usize], future)
+        spawn_pinned_at(worker_id, &self.workers, future)
     }
 
     pub fn spawn_pinned<F, Fut>(&self, future: F) -> JoinHandle<Fut::Output>
@@ -48,14 +51,12 @@ impl RuntimeContext {
         Fut: Future + 'static,
         Fut::Output: 'static,
     {
-        let worker = unsafe {
-            crate::utils::min_by_key(&self.workers, |worker| worker.task_counter.load().total())
-        };
-        spawn_pinned_at(worker, future)
+        let idx = self.workers.least_loaded_worker_index();
+        spawn_pinned_at(idx as u8, &self.workers, future)
     }
 }
 
-fn spawn_pinned_at<F, Fut>(worker: &Worker, future: F) -> JoinHandle<Fut::Output>
+fn spawn_pinned_at<F, Fut>(id: u8, workers: &Workers, future: F) -> JoinHandle<Fut::Output>
 where
     F: FnOnce() -> Fut + Send,
     Fut: Future + 'static,
@@ -63,11 +64,13 @@ where
 {
     let (task, join) = Task::new_local_with(
         Metadata {
-            kind: TaskKind::Pinned(worker.id),
+            kind: TaskKind::Pinned(id),
         },
         future(),
-        |_| {},
+        Scheduler,
     );
-    worker.shared_queue.push(task);
+    let index = id as usize;
+    workers.shared_queues[index].push(task);
+    workers.task_counters[index].increase_shared();
     join
 }

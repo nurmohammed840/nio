@@ -1,18 +1,18 @@
 #[inline]
 /// Safety: caller must insure that `data` is not empty.
-pub unsafe fn min_by_key<T, B: Ord>(data: &[T], f: fn(&T) -> B) -> &T {
+pub unsafe fn min_index_by_key<T, B: Ord>(data: &[T], f: fn(&T) -> B) -> usize {
     debug_assert!(!data.is_empty());
 
-    let mut val_x = unsafe { data.get_unchecked(0) };
-    let mut x = f(val_x);
+    let mut x = f(unsafe { data.get_unchecked(0) });
+    let mut x_idx = 0;
 
-    for val_y in unsafe { data.get_unchecked(1..) } {
-        let y = f(val_y);
+    for y_idx in 1..data.len() {
+        let y = f(unsafe { data.get_unchecked(y_idx) });
         if x < y {
             break;
         }
         x = y;
-        val_x = val_y;
+        x_idx = y_idx;
     }
-    val_x
+    x_idx
 }
