@@ -1,7 +1,6 @@
 #![allow(unused)]
 mod context;
 mod local_context;
-mod local_queue;
 mod task_counter;
 mod worker;
 
@@ -49,14 +48,15 @@ impl Runtime {
     }
 
     pub fn block_on(self) {
+        let event_interval = self.config.event_interval;
         for id in 1..self.config.worker_threads {
             let runtime = self.context.clone();
             self.create_thread(id)
-                .spawn(move || Worker::job(id, runtime))
+                .spawn(move || Worker::job(id, event_interval, runtime))
                 .expect(&format!("failed to spawn worker thread: {id}"));
         }
         drop(self.config);
 
-        Worker::job(0, self.context)
+        Worker::job(0, event_interval, self.context)
     }
 }

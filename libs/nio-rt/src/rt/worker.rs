@@ -5,7 +5,6 @@ use crossbeam_queue::SegQueue;
 use nio_task::{Status, Task};
 
 use local_context::LocalContext;
-use local_queue::LocalQueue;
 use task_counter::TaskCounter;
 
 pub struct Worker {
@@ -21,18 +20,45 @@ impl Worker {
         }
     }
 
-    pub fn job(id: u8, runtime_ctx: Arc<RuntimeContext>) {
-        let local_queue: LocalQueue = LocalQueue::new(512);
-        LocalContext::init(local_queue.clone(), id, runtime_ctx);
+    pub fn job(id: u8, tick: u32, runtime_ctx: Arc<RuntimeContext>) {
+        let context = LocalContext::new(id, 512, runtime_ctx);
+        context.clone().init();
 
-        while let Some(task) = unsafe { local_queue.get_mut() }.pop_front() {
-            match task.poll() {
-                Status::Yielded(task) => {
-                    unsafe { local_queue.get_mut() }.push_back(task);
+        let worker = context.current();
+
+        let mut tick = Tick(tick);
+        while !tick.is_complete() {
+            match unsafe { context.local_queue() }.pop_front() {
+                Some(task) => match task.poll() {
+                    Status::Yielded(task) => {
+                        unsafe { context.local_queue() }.push_back(task);
+                    }
+                    Status::Pending | Status::Complete => {
+                        tick.step();
+                        let counter = worker.task_counter.decrease_local();
+                        unsafe { context.move_tasks_from_shared_to_local_queue(counter) };
+                    }
+                },
+                None => {
+                    let counter = worker.task_counter.load();
+                    if counter.shared_queue_has_data() {
+                        unsafe { context.move_tasks_from_shared_to_local_queue(counter) };
+                    } else {
+                        break;
+                    }
                 }
-                Status::Pending => {}
-                Status::Complete => {}
             }
         }
+    }
+}
+
+struct Tick(pub u32);
+
+impl Tick {
+    fn is_complete(&self) -> bool {
+        self.0 == 0
+    }
+    fn step(&mut self) {
+        self.0 -= 1;
     }
 }

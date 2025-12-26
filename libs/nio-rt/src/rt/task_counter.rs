@@ -25,6 +25,11 @@ impl Counter {
     }
 
     #[inline]
+    pub fn shared_queue_has_data(self) -> bool {
+        self.shared() > 0
+    }
+
+    #[inline]
     pub fn total(self) -> u64 {
         self.local() + self.shared()
     }
@@ -50,6 +55,7 @@ impl TaskCounter {
         old
     }
 
+    /// Only this function is allowed to call from other thread.
     pub fn increase_shared(&self) {
         self.counter.fetch_add(SHARED_COUNTER, Relaxed);
     }

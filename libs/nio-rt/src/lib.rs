@@ -7,6 +7,8 @@ pub struct RuntimeConfig {
     worker_stack_size: Option<usize>,
     worker_name: Box<dyn Fn(u8) -> String>,
 
+    event_interval: u32,
+
     max_blocking_threads: u16,
     thread_stack_size: usize,
     thread_name: Option<Box<dyn Fn(usize) -> String + Send + Sync>>,
@@ -21,6 +23,8 @@ impl Default for RuntimeConfig {
                 .unwrap_or(1)
                 .try_into()
                 .unwrap(),
+
+            event_interval: 61,
 
             worker_stack_size: None,
             thread_stack_size: 0,
@@ -46,6 +50,12 @@ impl RuntimeConfig {
     pub fn worker_stack_size(mut self, size: usize) -> Self {
         assert!(size > 0);
         self.worker_stack_size = Some(size);
+        self
+    }
+
+    pub fn event_interval(mut self, tick: u32) -> Self {
+        assert!(tick > 0);
+        self.event_interval = tick;
         self
     }
 
