@@ -1,3 +1,4 @@
+#![doc = include_str!("../README.md")]
 #![allow(unsafe_op_in_unsafe_fn)]
 
 mod blocking;
@@ -28,13 +29,13 @@ use std::{
     task::{Context, Poll, Wake, Waker},
 };
 
-pub trait Scheduler<M>: Send + 'static {
+pub trait Scheduler<M>: 'static {
     fn schedule(&self, task: Task<M>);
 }
 
 impl<F, M> Scheduler<M> for F
 where
-    F: Fn(Task<M>) + Send + 'static,
+    F: Fn(Task<M>) + 'static,
 {
     fn schedule(&self, runnable: Task<M>) {
         self(runnable)
@@ -44,7 +45,7 @@ where
 struct RawTaskInner<F: Future, S: Scheduler<M>, M> {
     header: Header,
     future: UnsafeCell<Fut<F, F::Output>>,
-    meta: M,
+    meta: UnsafeCell<M>,
     scheduler: S,
 }
 
@@ -62,10 +63,22 @@ unsafe impl<M> Sync for Task<M> {}
 impl<M> std::panic::UnwindSafe for Task<M> {}
 impl<M> std::panic::RefUnwindSafe for Task<M> {}
 
+pub struct Metadata<M>(Task<M>);
+
+impl<M> Metadata<M> {
+    pub fn get(&self) -> &M {
+        self.0.metadata()
+    }
+
+    pub fn get_mut(&mut self) -> &mut M {
+        self.0.metadata_mut()
+    }
+}
+
 pub enum Status<M> {
     Yielded(Task<M>),
     Pending,
-    Complete,
+    Complete(Metadata<M>),
 }
 
 impl Task {
@@ -93,9 +106,13 @@ impl<M> Task<M> {
         unsafe { &*self.raw.metadata().cast::<M>() }
     }
 
+    pub fn metadata_mut(&mut self) -> &mut M {
+        unsafe { &mut *self.raw.metadata().cast::<M>() }
+    }
+
     pub fn new_with<F, S>(meta: M, future: F, scheduler: S) -> (Self, JoinHandle<F::Output>)
     where
-        M: 'static,
+        M: 'static + Send,
         F: Future + Send + 'static,
         F::Output: Send,
         S: Scheduler<M>,
@@ -103,7 +120,7 @@ impl<M> Task<M> {
         let raw = Arc::new(RawTaskInner {
             header: Header::new(),
             future: UnsafeCell::new(Fut::Future(future)),
-            meta,
+            meta: UnsafeCell::new(meta),
             scheduler,
         });
         let join_handle = JoinHandle::new(raw.clone());
@@ -118,7 +135,7 @@ impl<M> Task<M> {
 
     pub fn new_local_with<F, S>(meta: M, future: F, scheduler: S) -> (Self, JoinHandle<F::Output>)
     where
-        M: 'static,
+        M: 'static + Send,
         F: Future + 'static,
         F::Output: 'static,
         S: Scheduler<M>,
@@ -126,7 +143,7 @@ impl<M> Task<M> {
         let raw = Arc::new(RawTaskInner {
             header: Header::new(),
             future: UnsafeCell::new(Fut::Future(future)),
-            meta,
+            meta: UnsafeCell::new(meta),
             scheduler,
         });
         let join_handle = JoinHandle::new(raw.clone());
@@ -150,7 +167,7 @@ impl<M> Task<M> {
         match unsafe { self.raw.poll(&waker) } {
             PollStatus::Yield => Status::Yielded(self),
             PollStatus::Pending => Status::Pending,
-            PollStatus::Complete => Status::Complete,
+            PollStatus::Complete => Status::Complete(Metadata(self)),
         }
     }
 
@@ -181,8 +198,8 @@ where
         &self.header
     }
 
-    unsafe fn metadata(&self) -> *const () {
-        &self.meta as *const _ as *const ()
+    unsafe fn metadata(&self) -> *mut () {
+        self.meta.get().cast()
     }
 
     /// State transitions:

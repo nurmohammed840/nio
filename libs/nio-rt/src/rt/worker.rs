@@ -33,7 +33,7 @@ impl Worker {
                     Status::Yielded(task) => {
                         unsafe { context.local_queue() }.push_back(task);
                     }
-                    Status::Pending | Status::Complete => {
+                    Status::Pending | Status::Complete(_) => {
                         tick.step();
                         let counter = worker.task_counter.decrease_local();
                         unsafe { context.move_tasks_from_shared_to_local_queue(counter) };

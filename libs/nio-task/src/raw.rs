@@ -41,7 +41,7 @@ pub trait RawTaskVTable {
     fn header(&self) -> &Header;
     fn waker(self: Arc<Self>) -> Waker;
 
-    unsafe fn metadata(&self) -> *const ();
+    unsafe fn metadata(&self) -> *mut ();
 
     unsafe fn poll(&self, waker: &Waker) -> PollStatus;
     unsafe fn schedule(self: Arc<Self>);
@@ -158,10 +158,7 @@ impl Header {
                 .and_then(|_| unsafe { self.set_join_waker(waker.clone()) })
         };
 
-        match res {
-            Ok(_) => false,
-            Err(_) => true, // Task is `COMPLETE`
-        }
+        res.is_err() // If Error, Task is `COMPLETE`
     }
 
     /// This function return `Err(..)` If task is COMPLETE.

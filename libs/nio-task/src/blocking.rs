@@ -58,8 +58,8 @@ where
         NOOP_WAKER
     }
 
-    unsafe fn metadata(&self) -> *const () {
-        std::ptr::null()
+    unsafe fn metadata(&self) -> *mut () {
+        std::ptr::null_mut()
     }
 
     /// Panicking is acceptable here, as `BlockingTask` is only execute within the thread pool

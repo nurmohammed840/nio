@@ -185,7 +185,7 @@ fn run_and_cancel() {
 
     join.abort();
     let _ = future::block_on(join);
-    
+
     assert_eq!(POLL.load(Ordering::SeqCst), 1);
     assert_eq!(SCHEDULE.load(Ordering::SeqCst), 0);
     assert_eq!(DROP_F.load(Ordering::SeqCst), 1);
