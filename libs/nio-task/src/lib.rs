@@ -20,6 +20,7 @@ use std::{
     cell::UnsafeCell,
     fmt,
     future::Future,
+    marker::PhantomData,
     mem::ManuallyDrop,
     panic::{AssertUnwindSafe, catch_unwind},
     pin::Pin,
@@ -27,39 +28,42 @@ use std::{
     task::{Context, Poll, Wake, Waker},
 };
 
-pub trait Scheduler: Send + 'static {
-    fn schedule(&self, task: Task);
+pub trait Scheduler<M>: Send + 'static {
+    fn schedule(&self, task: Task<M>);
 }
 
-impl<F> Scheduler for F
+impl<F, M> Scheduler<M> for F
 where
-    F: Fn(Task) + Send + 'static,
+    F: Fn(Task<M>) + Send + 'static,
 {
-    fn schedule(&self, runnable: Task) {
+    fn schedule(&self, runnable: Task<M>) {
         self(runnable)
     }
 }
 
-struct RawTaskInner<F: Future, S: Scheduler> {
+struct RawTaskInner<F: Future, S: Scheduler<M>, M> {
     header: Header,
     future: UnsafeCell<Fut<F, F::Output>>,
+    meta: M,
     scheduler: S,
 }
 
-unsafe impl<F: Future, S: Scheduler> Sync for RawTaskInner<F, S> {}
+unsafe impl<F: Future, S: Scheduler<M>, M> Send for RawTaskInner<F, S, M> {}
+unsafe impl<F: Future, S: Scheduler<M>, M> Sync for RawTaskInner<F, S, M> {}
 
-pub struct Task {
+pub struct Task<M = ()> {
     raw: RawTask,
+    _meta: PhantomData<M>,
 }
 
-unsafe impl Send for Task {}
-unsafe impl Sync for Task {}
+unsafe impl<M> Send for Task<M> {}
+unsafe impl<M> Sync for Task<M> {}
 
-impl std::panic::UnwindSafe for Task {}
-impl std::panic::RefUnwindSafe for Task {}
+impl<M> std::panic::UnwindSafe for Task<M> {}
+impl<M> std::panic::RefUnwindSafe for Task<M> {}
 
-pub enum Status {
-    Yielded(Task),
+pub enum Status<M> {
+    Yielded(Task<M>),
     Pending,
     Complete,
 }
@@ -69,34 +73,74 @@ impl Task {
     where
         F: Future + Send + 'static,
         F::Output: Send,
-        S: Scheduler,
+        S: Scheduler<()>,
     {
-        let raw = Arc::new(RawTaskInner {
-            header: Header::new(),
-            future: UnsafeCell::new(Fut::Future(future)),
-            scheduler,
-        });
-        let join_handle = JoinHandle::new(raw.clone());
-        (Self { raw }, join_handle)
+        Self::new_with((), future, scheduler)
     }
 
     pub fn new_local<F, S>(future: F, scheduler: S) -> (Self, JoinHandle<F::Output>)
     where
         F: Future + 'static,
         F::Output: 'static,
-        S: Scheduler,
+        S: Scheduler<()>,
+    {
+        Self::new_local_with((), future, scheduler)
+    }
+}
+
+impl<M> Task<M> {
+    pub fn metadata(&self) -> &M {
+        unsafe { &*self.raw.metadata().cast::<M>() }
+    }
+
+    pub fn new_with<F, S>(meta: M, future: F, scheduler: S) -> (Self, JoinHandle<F::Output>)
+    where
+        M: 'static,
+        F: Future + Send + 'static,
+        F::Output: Send,
+        S: Scheduler<M>,
     {
         let raw = Arc::new(RawTaskInner {
             header: Header::new(),
             future: UnsafeCell::new(Fut::Future(future)),
+            meta,
             scheduler,
         });
         let join_handle = JoinHandle::new(raw.clone());
-        (Self { raw }, join_handle)
+        (
+            Self {
+                raw,
+                _meta: PhantomData,
+            },
+            join_handle,
+        )
+    }
+
+    pub fn new_local_with<F, S>(meta: M, future: F, scheduler: S) -> (Self, JoinHandle<F::Output>)
+    where
+        M: 'static,
+        F: Future + 'static,
+        F::Output: 'static,
+        S: Scheduler<M>,
+    {
+        let raw = Arc::new(RawTaskInner {
+            header: Header::new(),
+            future: UnsafeCell::new(Fut::Future(future)),
+            meta,
+            scheduler,
+        });
+        let join_handle = JoinHandle::new(raw.clone());
+        (
+            Self {
+                raw,
+                _meta: PhantomData,
+            },
+            join_handle,
+        )
     }
 
     #[inline]
-    pub fn poll(self) -> Status {
+    pub fn poll(self) -> Status<M> {
         // Don't increase ref-counter
         let raw = unsafe { Arc::from_raw(Arc::as_ptr(&self.raw)) };
         // Don't decrease ref-counter
@@ -121,20 +165,24 @@ impl Task {
     }
 }
 
-impl<F, S> RawTaskVTable for RawTaskInner<F, S>
+impl<F, S, M> RawTaskVTable for RawTaskInner<F, S, M>
 where
+    M: 'static,
     F: Future + 'static,
-    S: Scheduler,
+    S: Scheduler<M>,
 {
     #[inline]
     fn waker(self: Arc<Self>) -> Waker {
-        // Waker::from(self)
-        todo!()
+        Waker::from(self)
     }
 
     #[inline]
     fn header(&self) -> &Header {
         &self.header
+    }
+
+    unsafe fn metadata(&self) -> *const () {
+        &self.meta as *const _ as *const ()
     }
 
     /// State transitions:
@@ -183,7 +231,10 @@ where
     }
 
     unsafe fn schedule(self: Arc<Self>) {
-        self.scheduler.schedule(Task { raw: self.clone() });
+        self.scheduler.schedule(Task {
+            raw: self.clone(),
+            _meta: PhantomData,
+        });
     }
 
     unsafe fn abort_task(self: Arc<Self>) {
@@ -212,20 +263,25 @@ where
     }
 }
 
-impl<F, S> RawTaskInner<F, S>
+impl<F, S, M> RawTaskInner<F, S, M>
 where
+    M: 'static,
     F: Future + 'static,
-    S: Scheduler,
+    S: Scheduler<M>,
 {
     unsafe fn schedule_by_ref(self: &Arc<Self>) {
-        self.scheduler.schedule(Task { raw: self.clone() });
+        self.scheduler.schedule(Task {
+            raw: self.clone(),
+            _meta: PhantomData,
+        });
     }
 }
 
-impl<F, S> Wake for RawTaskInner<F, S>
+impl<F, S, M> Wake for RawTaskInner<F, S, M>
 where
+    M: 'static,
     F: Future + 'static,
-    S: Scheduler,
+    S: Scheduler<M>,
 {
     fn wake(self: Arc<Self>) {
         unsafe {
@@ -244,7 +300,7 @@ where
     }
 }
 
-impl fmt::Debug for Task {
+impl<M> fmt::Debug for Task<M> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Task")
             .field("id", &self.id())

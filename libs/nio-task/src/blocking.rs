@@ -58,6 +58,10 @@ where
         NOOP_WAKER
     }
 
+    unsafe fn metadata(&self) -> *const () {
+        std::ptr::null()
+    }
+
     /// Panicking is acceptable here, as `BlockingTask` is only execute within the thread pool
     unsafe fn poll(&self, _: &Waker) -> PollStatus {
         let output = match (*self.func.get()).take() {

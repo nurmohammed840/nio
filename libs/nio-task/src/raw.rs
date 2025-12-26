@@ -41,6 +41,8 @@ pub trait RawTaskVTable {
     fn header(&self) -> &Header;
     fn waker(self: Arc<Self>) -> Waker;
 
+    unsafe fn metadata(&self) -> *const ();
+
     unsafe fn poll(&self, waker: &Waker) -> PollStatus;
     unsafe fn schedule(self: Arc<Self>);
 
