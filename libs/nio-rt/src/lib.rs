@@ -1,4 +1,3 @@
-mod blocking;
 pub mod rt;
 
 use std::time::Duration;
