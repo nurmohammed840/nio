@@ -12,6 +12,17 @@ pub struct Metadata {
     pub kind: TaskKind,
 }
 
+#[cfg(debug_assertions)]
+impl Drop for Metadata {
+    fn drop(&mut self) {
+        if let TaskKind::Pinned(id) = self.kind {
+            LocalContext::with(|context| {
+                assert_eq!(id, context.worker_id);
+            });
+        }
+    }
+}
+
 pub type Task = nio_task::Task<Metadata>;
 
 pub struct Scheduler;

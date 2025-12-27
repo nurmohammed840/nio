@@ -19,7 +19,7 @@ pub use join::JoinHandle;
 use state::*;
 use std::{
     cell::UnsafeCell,
-    fmt,
+    fmt::{self, Debug},
     future::Future,
     marker::PhantomData,
     mem::ManuallyDrop,
@@ -53,7 +53,7 @@ unsafe impl<F: Future, S: Scheduler<M>, M> Send for RawTaskInner<F, S, M> {}
 unsafe impl<F: Future, S: Scheduler<M>, M> Sync for RawTaskInner<F, S, M> {}
 
 pub struct Task<M = ()> {
-    raw: RawTask,
+    raw: Option<RawTask>,
     _meta: PhantomData<M>,
 }
 
@@ -62,6 +62,16 @@ unsafe impl<M> Sync for Task<M> {}
 
 impl<M> std::panic::UnwindSafe for Task<M> {}
 impl<M> std::panic::RefUnwindSafe for Task<M> {}
+
+impl<M> Drop for Task<M> {
+    fn drop(&mut self) {
+        if let Some(raw) = self.raw.take() {
+            unsafe { raw.drop_task() };
+        }
+    }
+}
+
+// ------------------------------------------------
 
 pub struct Metadata<M>(Task<M>);
 
@@ -103,11 +113,19 @@ impl Task {
 
 impl<M> Task<M> {
     pub fn metadata(&self) -> &M {
-        unsafe { &*self.raw.metadata().cast::<M>() }
+        unsafe {
+            &*(self.raw.as_ref().unwrap_unchecked())
+                .metadata()
+                .cast::<M>()
+        }
     }
 
     pub fn metadata_mut(&mut self) -> &mut M {
-        unsafe { &mut *self.raw.metadata().cast::<M>() }
+        unsafe {
+            &mut *(self.raw.as_ref().unwrap_unchecked())
+                .metadata()
+                .cast::<M>()
+        }
     }
 
     pub fn new_with<F, S>(meta: M, future: F, scheduler: S) -> (Self, JoinHandle<F::Output>)
@@ -126,7 +144,7 @@ impl<M> Task<M> {
         let join_handle = JoinHandle::new(raw.clone());
         (
             Self {
-                raw,
+                raw: Some(raw),
                 _meta: PhantomData,
             },
             join_handle,
@@ -149,7 +167,7 @@ impl<M> Task<M> {
         let join_handle = JoinHandle::new(raw.clone());
         (
             Self {
-                raw,
+                raw: Some(raw),
                 _meta: PhantomData,
             },
             join_handle,
@@ -157,28 +175,32 @@ impl<M> Task<M> {
     }
 
     #[inline]
-    pub fn poll(self) -> Status<M> {
+    pub fn poll(mut self) -> Status<M> {
+        let inner = unsafe { self.raw.take().unwrap_unchecked() };
         // Don't increase ref-counter
-        let raw = unsafe { Arc::from_raw(Arc::as_ptr(&self.raw)) };
+        let raw = unsafe { Arc::from_raw(Arc::as_ptr(&inner)) };
         // Don't decrease ref-counter
         let waker = ManuallyDrop::new(raw.waker());
 
         // SAFETY: `Task` does not implement `Clone` and we have owned access
-        match unsafe { self.raw.poll(&waker) } {
-            PollStatus::Yield => Status::Yielded(self),
+        match unsafe { inner.poll(&waker) } {
+            PollStatus::Yield => Status::Yielded(Self {
+                raw: Some(inner),
+                _meta: PhantomData,
+            }),
             PollStatus::Pending => Status::Pending,
             PollStatus::Complete => Status::Complete(Metadata(self)),
         }
     }
 
     #[inline]
-    pub fn schedule(self) {
-        unsafe { self.raw.schedule() }
+    pub fn schedule(mut self) {
+        unsafe { self.raw.take().unwrap_unchecked().schedule() }
     }
 
     #[inline]
     pub fn id(&self) -> Id {
-        Id::new(&self.raw)
+        Id::new(unsafe { self.raw.as_ref().unwrap_unchecked() })
     }
 }
 
@@ -249,9 +271,14 @@ where
 
     unsafe fn schedule(self: Arc<Self>) {
         self.scheduler.schedule(Task {
-            raw: self.clone(),
+            raw: Some(self.clone()),
             _meta: PhantomData,
         });
+    }
+
+    unsafe fn drop_task(self: Arc<Self>) {
+        // TODO: Also drop task metadata
+        unsafe { (*self.future.get()).drop() }
     }
 
     unsafe fn abort_task(self: Arc<Self>) {
@@ -288,7 +315,7 @@ where
 {
     unsafe fn schedule_by_ref(self: &Arc<Self>) {
         self.scheduler.schedule(Task {
-            raw: self.clone(),
+            raw: Some(self.clone()),
             _meta: PhantomData,
         });
     }
@@ -317,11 +344,12 @@ where
     }
 }
 
-impl<M> fmt::Debug for Task<M> {
+impl<M: Debug> fmt::Debug for Task<M> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Task")
             .field("id", &self.id())
-            .field("state", &self.raw.header().state.load())
+            .field("state", &self.raw.as_ref().unwrap().header().state.load())
+            .field("metadata", self.metadata())
             .finish()
     }
 }

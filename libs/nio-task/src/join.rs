@@ -62,10 +62,7 @@ impl<T> Drop for JoinHandle<T> {
     }
 }
 
-impl<T> fmt::Debug for JoinHandle<T>
-where
-    T: fmt::Debug,
-{
+impl<T> fmt::Debug for JoinHandle<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("JoinHandle")
             .field("id", &self.id())

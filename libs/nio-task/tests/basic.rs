@@ -87,8 +87,12 @@ fn drop_and_detach() {
     assert_eq!(DROP_S.load(Ordering::SeqCst), 0);
 
     drop(task);
-    drop(join);
+    assert_eq!(POLL.load(Ordering::SeqCst), 0);
+    assert_eq!(SCHEDULE.load(Ordering::SeqCst), 0);
+    assert_eq!(DROP_F.load(Ordering::SeqCst), 1);
+    assert_eq!(DROP_S.load(Ordering::SeqCst), 0);
 
+    drop(join);
     assert_eq!(POLL.load(Ordering::SeqCst), 0);
     assert_eq!(SCHEDULE.load(Ordering::SeqCst), 0);
     assert_eq!(DROP_F.load(Ordering::SeqCst), 1);
@@ -217,10 +221,12 @@ fn cancel_join() {
     assert_eq!(DROP_S.load(Ordering::SeqCst), 0);
 
     join.abort();
+    drop(join);
+    
     assert_eq!(POLL.load(Ordering::SeqCst), 1);
     assert_eq!(SCHEDULE.load(Ordering::SeqCst), 0);
     assert_eq!(DROP_F.load(Ordering::SeqCst), 1);
-    assert_eq!(DROP_S.load(Ordering::SeqCst), 0);
+    assert_eq!(DROP_S.load(Ordering::SeqCst), 1);
 }
 
 #[test]

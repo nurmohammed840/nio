@@ -45,6 +45,7 @@ pub trait RawTaskVTable {
 
     unsafe fn poll(&self, waker: &Waker) -> PollStatus;
     unsafe fn schedule(self: Arc<Self>);
+    unsafe fn drop_task(self: Arc<Self>);
 
     unsafe fn abort_task(self: Arc<Self>);
     /// `dst: &mut Poll<Result<Future::Output, JoinError>>`
