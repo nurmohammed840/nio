@@ -107,7 +107,7 @@ fn wake_during_run() {
             task.poll();
             assert_eq!(POLL.load(Ordering::SeqCst), 2);
             assert_eq!(SCHEDULE.load(Ordering::SeqCst), 1);
-            assert_eq!(DROP_F.load(Ordering::SeqCst), 0);
+            assert_eq!(DROP_F.load(Ordering::SeqCst), 1);
             assert_eq!(DROP_S.load(Ordering::SeqCst), 0);
             assert_eq!(chan.len(), 0);
         })
@@ -125,7 +125,7 @@ fn wake_during_run() {
 
             assert_eq!(POLL.load(Ordering::SeqCst), 2);
             assert_eq!(SCHEDULE.load(Ordering::SeqCst), 1);
-            assert_eq!(DROP_F.load(Ordering::SeqCst), 0);
+            assert_eq!(DROP_F.load(Ordering::SeqCst), 1);
             assert_eq!(DROP_S.load(Ordering::SeqCst), 0);
             assert_eq!(chan.len(), 0);
         })

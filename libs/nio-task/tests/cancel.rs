@@ -1,3 +1,4 @@
+mod async_task;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -5,8 +6,8 @@ use std::task::{Context, Poll};
 use std::thread;
 use std::time::Duration;
 
+use async_task::Runnable;
 use easy_parallel::Parallel;
-use nio_task::Task;
 use smol::future;
 
 // Creates a future with event counters.
@@ -80,9 +81,9 @@ macro_rules! schedule {
             }
 
             let guard = Guard(Box::new(0));
-            move |task: Task| {
+            move |runnable: Runnable| {
                 let _ = &guard;
-                task.schedule();
+                runnable.schedule();
                 $sched.fetch_add(1, Ordering::SeqCst);
             }
         };
@@ -97,17 +98,16 @@ fn ms(ms: u64) -> Duration {
 fn run_and_cancel() {
     future!(f, POLL, DROP_F, DROP_T);
     schedule!(s, SCHEDULE, DROP_S);
-    let (task, join) = Task::new(f, s);
+    let (runnable, task) = async_task::spawn(f, s);
 
-    task.poll();
+    runnable.run();
     assert_eq!(POLL.load(Ordering::SeqCst), 1);
     assert_eq!(SCHEDULE.load(Ordering::SeqCst), 0);
     assert_eq!(DROP_F.load(Ordering::SeqCst), 1);
     assert_eq!(DROP_T.load(Ordering::SeqCst), 0);
     assert_eq!(DROP_S.load(Ordering::SeqCst), 0);
 
-    join.abort();
-    assert!(future::block_on(join).is_ok());
+    assert!(future::block_on(task.cancel()).is_some());
     assert_eq!(POLL.load(Ordering::SeqCst), 1);
     assert_eq!(SCHEDULE.load(Ordering::SeqCst), 0);
     assert_eq!(DROP_F.load(Ordering::SeqCst), 1);
@@ -119,14 +119,14 @@ fn run_and_cancel() {
 fn cancel_and_run() {
     future!(f, POLL, DROP_F, DROP_T);
     schedule!(s, SCHEDULE, DROP_S);
-    let (task, join) = Task::new(f, s);
+    let (runnable, task) = async_task::spawn(f, s);
 
     Parallel::new()
         .add(|| {
             thread::sleep(ms(200));
-            task.poll();
+            runnable.run();
 
-            assert_eq!(POLL.load(Ordering::SeqCst), 1);
+            assert_eq!(POLL.load(Ordering::SeqCst), 0);
             assert_eq!(SCHEDULE.load(Ordering::SeqCst), 0);
             assert_eq!(DROP_F.load(Ordering::SeqCst), 1);
             assert_eq!(DROP_T.load(Ordering::SeqCst), 0);
@@ -136,15 +136,14 @@ fn cancel_and_run() {
             assert_eq!(DROP_S.load(Ordering::SeqCst), 1);
         })
         .add(|| {
-            join.abort();
-            assert!(future::block_on(join).is_ok());
+            assert!(future::block_on(task.cancel()).is_none());
 
             thread::sleep(ms(200));
 
-            assert_eq!(POLL.load(Ordering::SeqCst), 1);
+            assert_eq!(POLL.load(Ordering::SeqCst), 0);
             assert_eq!(SCHEDULE.load(Ordering::SeqCst), 0);
             assert_eq!(DROP_F.load(Ordering::SeqCst), 1);
-            assert_eq!(DROP_T.load(Ordering::SeqCst), 1);
+            assert_eq!(DROP_T.load(Ordering::SeqCst), 0);
 
             thread::sleep(ms(200));
 
@@ -157,11 +156,11 @@ fn cancel_and_run() {
 fn cancel_during_run() {
     future!(f, POLL, DROP_F, DROP_T);
     schedule!(s, SCHEDULE, DROP_S);
-    let (task, join) = Task::new(f, s);
+    let (runnable, task) = async_task::spawn(f, s);
 
     Parallel::new()
         .add(|| {
-            task.poll();
+            runnable.run();
 
             thread::sleep(ms(200));
 
@@ -174,8 +173,7 @@ fn cancel_during_run() {
         .add(|| {
             thread::sleep(ms(200));
 
-            join.abort();
-            assert!(future::block_on(join).is_ok());
+            assert!(future::block_on(task.cancel()).is_some());
             assert_eq!(POLL.load(Ordering::SeqCst), 1);
             assert_eq!(SCHEDULE.load(Ordering::SeqCst), 0);
             assert_eq!(DROP_F.load(Ordering::SeqCst), 1);

@@ -73,15 +73,18 @@ impl<M> Drop for Task<M> {
 
 // ------------------------------------------------
 
-pub struct Metadata<M>(Task<M>);
+pub struct Metadata<M = ()> {
+    raw: RawTask,
+    _meta: PhantomData<M>,
+}
 
 impl<M> Metadata<M> {
     pub fn get(&self) -> &M {
-        self.0.metadata()
+        unsafe { &*self.raw.metadata().cast::<M>() }
     }
 
     pub fn get_mut(&mut self) -> &mut M {
-        self.0.metadata_mut()
+        unsafe { &mut *self.raw.metadata().cast::<M>() }
     }
 }
 
@@ -189,7 +192,10 @@ impl<M> Task<M> {
                 _meta: PhantomData,
             }),
             PollStatus::Pending => Status::Pending,
-            PollStatus::Complete => Status::Complete(Metadata(self)),
+            PollStatus::Complete => Status::Complete(Metadata {
+                raw: inner,
+                _meta: PhantomData,
+            }),
         }
     }
 
@@ -233,18 +239,21 @@ where
         let is_cancelled = self.header.transition_to_running_and_check_if_cancelled();
 
         let has_output = catch_unwind(AssertUnwindSafe(|| {
-            let poll_result = unsafe {
-                let fut = match &mut *self.future.get() {
-                    Fut::Future(fut) => Pin::new_unchecked(fut),
-                    _ => unreachable!(),
+            let result = if is_cancelled {
+                Err(JoinError::cancelled())
+            } else {
+                let poll_result = unsafe {
+                    let fut = match &mut *self.future.get() {
+                        Fut::Future(fut) => Pin::new_unchecked(fut),
+                        _ => unreachable!(),
+                    };
+                    // Polling may panic, but we catch it in outer layer.
+                    fut.poll(&mut Context::from_waker(waker))
                 };
-                // Polling may panic, but we catch it in outer layer.
-                fut.poll(&mut Context::from_waker(waker))
-            };
-            let result = match poll_result {
-                Poll::Ready(val) => Ok(val),
-                Poll::Pending if is_cancelled => Err(JoinError::cancelled()),
-                Poll::Pending => return false,
+                match poll_result {
+                    Poll::Ready(val) => Ok(val),
+                    Poll::Pending => return false,
+                }
             };
             // Droping `Fut::Future` may also panic, but we catch it in outer layer
             unsafe {
@@ -277,8 +286,20 @@ where
     }
 
     unsafe fn drop_task(self: Arc<Self>) {
-        // TODO: Also drop task metadata
-        unsafe { (*self.future.get()).drop() }
+        // TODO: Also drop task metadata.
+
+        let may_panic = catch_unwind(AssertUnwindSafe(|| {
+            (*self.future.get()).set_output(Err(JoinError::cancelled()));
+        }));
+        if let Err(panic) = may_panic {
+            (*self.future.get()).set_output(Err(JoinError::panic(panic)));
+        }
+        if !self
+            .header
+            .transition_to_complete_and_notify_output_if_intrested()
+        {
+            unsafe { (*self.future.get()).drop() }
+        }
     }
 
     unsafe fn abort_task(self: Arc<Self>) {

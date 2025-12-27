@@ -66,9 +66,6 @@ impl Header {
         }
     }
 
-    /// After calling this function, executor have exclusive access to poll the future.
-    /// Until [`Header::transition_to_sleep`] is called.
-    ///
     /// `NOTIFIED -> RUNNING`
     pub fn transition_to_running_and_check_if_cancelled(&self) -> bool {
         let state = self.state.set_running();
