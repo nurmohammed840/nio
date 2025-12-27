@@ -78,6 +78,12 @@ pub struct Metadata<M = ()> {
     _meta: PhantomData<M>,
 }
 
+impl<M: Debug> Debug for Metadata<M> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.get().fmt(f)
+    }
+}
+
 impl<M> Metadata<M> {
     pub fn get(&self) -> &M {
         unsafe { &*self.raw.metadata().cast::<M>() }
@@ -88,6 +94,7 @@ impl<M> Metadata<M> {
     }
 }
 
+#[derive(Debug)]
 pub enum Status<M> {
     Yielded(Task<M>),
     Pending,
@@ -99,7 +106,7 @@ impl Task {
     where
         F: Future + Send + 'static,
         F::Output: Send,
-        S: Scheduler<()>,
+        S: Scheduler<()> + Send,
     {
         Self::new_with((), future, scheduler)
     }
@@ -108,7 +115,7 @@ impl Task {
     where
         F: Future + 'static,
         F::Output: 'static,
-        S: Scheduler<()>,
+        S: Scheduler<()> + Send,
     {
         Self::new_local_with((), future, scheduler)
     }
@@ -136,7 +143,7 @@ impl<M> Task<M> {
         M: 'static + Send,
         F: Future + Send + 'static,
         F::Output: Send,
-        S: Scheduler<M>,
+        S: Scheduler<M> + Send,
     {
         let raw = Arc::new(RawTaskInner {
             header: Header::new(),
@@ -159,8 +166,55 @@ impl<M> Task<M> {
         M: 'static + Send,
         F: Future + 'static,
         F::Output: 'static,
-        S: Scheduler<M>,
+        S: Scheduler<M> + Send,
     {
+        use std::mem::ManuallyDrop;
+        use std::pin::Pin;
+        use std::task::{Context, Poll};
+        use std::thread::{self, ThreadId};
+
+        #[inline]
+        fn thread_id() -> ThreadId {
+            std::thread_local! {
+                static ID: ThreadId = thread::current().id();
+            }
+            ID.try_with(|id| *id)
+                .unwrap_or_else(|_| thread::current().id())
+        }
+
+        struct Checked<F> {
+            id: ThreadId,
+            inner: ManuallyDrop<F>,
+        }
+
+        impl<F> Drop for Checked<F> {
+            fn drop(&mut self) {
+                assert!(
+                    self.id == thread_id(),
+                    "local task dropped by a thread that didn't spawn it"
+                );
+                unsafe {
+                    ManuallyDrop::drop(&mut self.inner);
+                }
+            }
+        }
+
+        impl<F: Future> Future for Checked<F> {
+            type Output = F::Output;
+            fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+                debug_assert!(
+                    self.id == thread_id(),
+                    "local task polled by a thread that didn't spawn it"
+                );
+                unsafe { self.map_unchecked_mut(|c| &mut *c.inner).poll(cx) }
+            }
+        }
+        
+        let future = Checked {
+            id: thread_id(),
+            inner: ManuallyDrop::new(future),
+        };
+
         let raw = Arc::new(RawTaskInner {
             header: Header::new(),
             future: UnsafeCell::new(Fut::Future(future)),
