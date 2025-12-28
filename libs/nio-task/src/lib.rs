@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 #![allow(unsafe_op_in_unsafe_fn)]
 
+mod abort;
 mod blocking;
 mod error;
 mod id;
@@ -11,6 +12,7 @@ mod waker;
 
 use crate::raw::*;
 
+pub use abort::AbortHandle;
 pub use blocking::BlockingTask;
 pub use error::JoinError;
 pub use id::Id;
@@ -108,18 +110,18 @@ pub enum Status<M> {
 impl Task {
     pub fn new<F, S>(future: F, scheduler: S) -> (Self, JoinHandle<F::Output>)
     where
-        F: Future + Send + 'static,
-        F::Output: Send,
         S: Scheduler<()> + Send,
+        F: Future + Send + 'static,
+        F::Output: Send + 'static,
     {
         Self::new_with((), future, scheduler)
     }
 
     pub fn new_local<F, S>(future: F, scheduler: S) -> (Self, JoinHandle<F::Output>)
     where
+        S: Scheduler<()> + Send,
         F: Future + 'static,
         F::Output: 'static,
-        S: Scheduler<()> + Send,
     {
         Self::new_local_with((), future, scheduler)
     }
@@ -145,9 +147,9 @@ impl<M> Task<M> {
     pub fn new_with<F, S>(meta: M, future: F, scheduler: S) -> (Self, JoinHandle<F::Output>)
     where
         M: 'static + Send,
-        F: Future + Send + 'static,
-        F::Output: Send,
         S: Scheduler<M> + Send,
+        F: Future + Send + 'static,
+        F::Output: Send + 'static,
     {
         let raw = Arc::new(RawTaskInner {
             header: Header::new(),
@@ -168,9 +170,9 @@ impl<M> Task<M> {
     pub fn new_local_with<F, S>(meta: M, future: F, scheduler: S) -> (Self, JoinHandle<F::Output>)
     where
         M: 'static + Send,
+        S: Scheduler<M> + Send,
         F: Future + 'static,
         F::Output: 'static,
-        S: Scheduler<M> + Send,
     {
         use std::mem::ManuallyDrop;
         use std::pin::Pin;

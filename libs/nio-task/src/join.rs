@@ -1,4 +1,4 @@
-use crate::raw::RawTask;
+use crate::{AbortHandle, raw::RawTask};
 
 use super::{COMPLETE, error::JoinError, id::Id};
 use std::{
@@ -25,6 +25,10 @@ impl<T> JoinHandle<T> {
             raw,
             _p: PhantomData,
         }
+    }
+
+    pub fn abort_handle(&self) -> AbortHandle {
+        AbortHandle::new(self.raw.clone())
     }
 
     pub fn abort(&self) {

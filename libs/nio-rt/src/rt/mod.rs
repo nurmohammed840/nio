@@ -47,13 +47,13 @@ impl Runtime {
         thread
     }
 
-    pub fn block_on<Fut>(self, fut: Fut)
+    pub fn block_on<Fut>(self, fut: Fut) -> Fut::Output
     where
-        Fut: Future + 'static,
-        Fut::Output: 'static,
+        Fut: Future + Send + 'static,
+        Fut::Output: Send + 'static,
     {
         let event_interval = self.config.event_interval;
-        for id in 1..self.config.worker_threads {
+        for id in 0..self.config.worker_threads {
             let runtime_ctx = self.context.clone();
             self.create_thread(id)
                 .spawn(move || {
@@ -66,10 +66,6 @@ impl Runtime {
         }
 
         drop(self.config);
-
-        Workers::job(
-            LocalContext::new(self.context.workers.id(0), 512, self.context),
-            event_interval,
-        );
+        nio_future::block_on(self.context.spawn_pinned_at(0, || fut)).unwrap()
     }
 }

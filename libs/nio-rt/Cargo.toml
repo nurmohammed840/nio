@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 nio-task = { path = "../nio-task", version = "*" }
+nio-future = { path = "../nio-future", version = "*" }
 nio-threadpool = { path = "../nio-threadpool", version = "*" }
 
 crossbeam-queue = "0.3"

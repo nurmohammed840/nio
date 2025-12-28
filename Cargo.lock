@@ -1060,6 +1060,7 @@ name = "nio-rt"
 version = "0.1.0"
 dependencies = [
  "crossbeam-queue",
+ "nio-future",
  "nio-task",
  "nio-threadpool",
 ]
