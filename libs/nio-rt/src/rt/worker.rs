@@ -9,16 +9,54 @@ use task_counter::TaskCounter;
 
 pub type SharedQueue = SegQueue<Task>;
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WorkerId(u8);
+
+impl WorkerId {
+    pub unsafe fn new(id: u8) -> WorkerId {
+        WorkerId(id)
+    }
+
+    #[inline]
+    pub fn get(self) -> usize {
+        self.0 as usize
+    }
+}
+
 pub struct Workers {
-    pub task_counters: Box<[TaskCounter]>,
-    pub shared_queues: Box<[SharedQueue]>,
+     task_counters: Box<[TaskCounter]>,
+     shared_queues: Box<[SharedQueue]>,
 }
 
 impl Workers {
-    pub fn least_loaded_worker_index(&self) -> usize {
-        // Safety: `task_counters` is not empty
+    pub fn create_id(&self, id: u8) -> WorkerId {
+        if self.task_counters.get(id as usize).is_none() {
+            panic!(
+                "invalid worker id {id}:, (valid range: 0..{})",
+                self.task_counters.len()
+            );
+        }
+        unsafe { WorkerId::new(id) }
+    }
+
+    #[inline]
+    pub fn task_counter(&self, id: WorkerId) -> &TaskCounter {
+        unsafe { self.task_counters.get_unchecked(id.get()) }
+    }
+
+    #[inline]
+    pub fn shared_queue(&self, id: WorkerId) -> &SharedQueue {
+        unsafe { self.shared_queues.get_unchecked(id.get()) }
+    }
+
+    pub fn least_loaded_worker_index(&self) -> WorkerId {
         unsafe {
-            crate::utils::min_index_by_key(&self.task_counters, |counter| counter.load().total())
+            // Safety: `task_counters` is not empty
+            let id = crate::utils::min_index_by_key(&self.task_counters, |counter| {
+                counter.load().total()
+            });
+            debug_assert!(self.task_counters.get(id).is_some());
+            WorkerId::new(id as u8)
         }
     }
 }
@@ -31,7 +69,7 @@ impl Workers {
         }
     }
 
-    pub fn job(id: u8, tick: u32, runtime_ctx: Arc<RuntimeContext>) {
+    pub fn job(id: WorkerId, tick: u32, runtime_ctx: Arc<RuntimeContext>) {
         let context = LocalContext::new(id, 512, runtime_ctx);
         context.clone().init();
 

@@ -3,20 +3,20 @@ use super::*;
 use std::{cell::UnsafeCell, collections::VecDeque, rc::Rc};
 use task::{JoinHandle, Metadata, Scheduler, Task, TaskKind};
 use task_counter::{Counter, TaskCounter};
-use worker::SharedQueue;
+use worker::{SharedQueue, WorkerId};
 
 thread_local! {
     static LOCAL_CONTEXT: UnsafeCell<Option<Rc<LocalContext>>> = UnsafeCell::new(None);
 }
 
 pub struct LocalContext {
-    pub worker_id: u8,
+    pub worker_id: WorkerId,
     pub local_queue: UnsafeCell<VecDeque<Task>>,
     pub runtime_ctx: Arc<RuntimeContext>,
 }
 
 impl LocalContext {
-    pub fn new(worker_id: u8, cap: usize, runtime_ctx: Arc<RuntimeContext>) -> Rc<Self> {
+    pub fn new(worker_id: WorkerId, cap: usize, runtime_ctx: Arc<RuntimeContext>) -> Rc<Self> {
         Rc::new(Self {
             worker_id,
             local_queue: UnsafeCell::new(VecDeque::with_capacity(cap)),
@@ -32,8 +32,14 @@ impl LocalContext {
     where
         F: FnOnce(&Self) -> R,
     {
-        LOCAL_CONTEXT
-            .with(|ctx| unsafe { f((*ctx.get()).as_ref().expect("no `Nio` runtime found")) })
+        Self::try_with(|ctx| f(ctx.expect("no `Nio` runtime found")))
+    }
+
+    pub fn try_with<F, R>(f: F) -> R
+    where
+        F: FnOnce(Option<&Rc<Self>>) -> R,
+    {
+        LOCAL_CONTEXT.with(|ctx| unsafe { f((*ctx.get()).as_ref()) })
     }
 
     // ------------------------------------------------------------------------
@@ -54,7 +60,9 @@ impl LocalContext {
                 kind: TaskKind::Pinned(self.worker_id),
             },
             future,
-            Scheduler,
+            Scheduler {
+                runtime_ctx: self.runtime_ctx.clone(),
+            },
         );
         self.add_task_to_local_queue(task);
         join
@@ -78,20 +86,13 @@ impl LocalContext {
         }
     }
 
+    #[inline]
     pub fn task_counter(&self) -> &TaskCounter {
-        unsafe {
-            self.runtime_ctx
-                .workers
-                .task_counters
-                .get_unchecked(self.worker_id as usize)
-        }
+        self.runtime_ctx.workers.task_counter(self.worker_id)
     }
+
+    #[inline]
     pub fn shared_queue(&self) -> &SharedQueue {
-        unsafe {
-            self.runtime_ctx
-                .workers
-                .shared_queues
-                .get_unchecked(self.worker_id as usize)
-        }
+        self.runtime_ctx.workers.shared_queue(self.worker_id)
     }
 }

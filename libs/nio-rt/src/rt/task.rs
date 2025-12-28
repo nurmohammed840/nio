@@ -1,11 +1,13 @@
+use std::sync::Arc;
+
 pub use nio_task::{JoinHandle, Status};
 use nio_threadpool::Runnable;
 
-use crate::rt::local_context::LocalContext;
+use super::{context::RuntimeContext, local_context::LocalContext, worker::WorkerId};
 
 pub enum TaskKind {
     Sendable,
-    Pinned(u8),
+    Pinned(WorkerId),
 }
 
 pub struct Metadata {
@@ -14,21 +16,21 @@ pub struct Metadata {
 
 pub type Task = nio_task::Task<Metadata>;
 
-pub struct Scheduler;
+pub struct Scheduler {
+    pub runtime_ctx: Arc<RuntimeContext>,
+}
 
 impl nio_task::Scheduler<Metadata> for Scheduler {
     fn schedule(&self, task: Task) {
-        LocalContext::with(move |context| match task.metadata().kind {
-            TaskKind::Sendable => {}
-            TaskKind::Pinned(id) if context.worker_id == id => {
-                context.add_task_to_local_queue(task);
-            }
+        match task.metadata().kind {
+            TaskKind::Sendable => self.runtime_ctx.send_task_to_least_loaded_worker(task),
             TaskKind::Pinned(id) => {
-                let workers = &context.runtime_ctx.workers;
-                workers.shared_queues[id as usize].push(task);
-                workers.task_counters[id as usize].increase_shared();
+                LocalContext::try_with(|ctx| match ctx {
+                    Some(ctx) if ctx.worker_id == id => ctx.add_task_to_local_queue(task),
+                    None | Some(_) => self.runtime_ctx.send_task_at(id, task),
+                });
             }
-        });
+        }
     }
 }
 

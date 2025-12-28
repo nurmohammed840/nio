@@ -5,7 +5,7 @@ mod task;
 mod task_counter;
 mod worker;
 
-use crate::RuntimeConfig;
+use crate::{RuntimeConfig, rt::worker::WorkerId};
 use std::{sync::Arc, thread};
 
 use nio_threadpool::ThreadPool;
@@ -53,11 +53,11 @@ impl Runtime {
         for id in 1..self.config.worker_threads {
             let runtime = self.context.clone();
             self.create_thread(id)
-                .spawn(move || Workers::job(id, event_interval, runtime))
+                .spawn(move || Workers::job(unsafe { WorkerId::new(id) }, event_interval, runtime))
                 .expect(&format!("failed to spawn worker thread: {id}"));
         }
         drop(self.config);
 
-        Workers::job(0, event_interval, self.context)
+        Workers::job(unsafe { WorkerId::new(0) }, event_interval, self.context)
     }
 }

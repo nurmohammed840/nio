@@ -1,3 +1,5 @@
+use crate::rt::worker::WorkerId;
+
 use super::*;
 use task::*;
 use worker::SharedQueue;
@@ -18,7 +20,7 @@ impl RuntimeContext {
         join
     }
 
-    pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
+    pub fn spawn<F>(self: &Arc<Self>, future: F) -> JoinHandle<F::Output>
     where
         F: Future + Send + 'static,
         F::Output: Send + 'static,
@@ -28,49 +30,59 @@ impl RuntimeContext {
                 kind: TaskKind::Sendable,
             },
             future,
-            Scheduler,
+            Scheduler {
+                runtime_ctx: self.clone(),
+            },
         );
-        let index = self.workers.least_loaded_worker_index();
-        self.workers.shared_queues[index].push(task);
-        self.workers.task_counters[index].increase_shared();
+        let id = self.workers.least_loaded_worker_index();
+        self.workers.shared_queue(id).push(task);
+        self.workers.task_counter(id).increase_shared();
         join
     }
 
-    pub fn spawn_pinned_at<F, Fut>(&self, worker_id: u8, future: F) -> JoinHandle<Fut::Output>
+    pub fn spawn_pinned_at<F, Fut>(self: &Arc<Self>, id: u8, future: F) -> JoinHandle<Fut::Output>
     where
         F: FnOnce() -> Fut + Send,
         Fut: Future + 'static,
         Fut::Output: 'static,
     {
-        spawn_pinned_at(worker_id, &self.workers, future)
+        self._spawn_pinned_at(self.workers.create_id(id), future)
     }
 
-    pub fn spawn_pinned<F, Fut>(&self, future: F) -> JoinHandle<Fut::Output>
+    pub fn spawn_pinned<F, Fut>(self: &Arc<Self>, future: F) -> JoinHandle<Fut::Output>
     where
         F: FnOnce() -> Fut + Send,
         Fut: Future + 'static,
         Fut::Output: 'static,
     {
-        let idx = self.workers.least_loaded_worker_index();
-        spawn_pinned_at(idx as u8, &self.workers, future)
+        let id = self.workers.least_loaded_worker_index();
+        self._spawn_pinned_at(id, future)
     }
-}
 
-fn spawn_pinned_at<F, Fut>(id: u8, workers: &Workers, future: F) -> JoinHandle<Fut::Output>
-where
-    F: FnOnce() -> Fut + Send,
-    Fut: Future + 'static,
-    Fut::Output: 'static,
-{
-    let (task, join) = Task::new_local_with(
-        Metadata {
-            kind: TaskKind::Pinned(id),
-        },
-        future(),
-        Scheduler,
-    );
-    let index = id as usize;
-    workers.shared_queues[index].push(task);
-    workers.task_counters[index].increase_shared();
-    join
+    fn _spawn_pinned_at<F, Fut>(
+        self: &Arc<Self>,
+        id: WorkerId,
+        future: F,
+    ) -> JoinHandle<Fut::Output>
+    where
+        F: FnOnce() -> Fut + Send,
+        Fut: Future + 'static,
+        Fut::Output: 'static,
+    {
+        let (task, join) = Task::new_local_with(
+            Metadata {
+                kind: TaskKind::Pinned(id),
+            },
+            future(),
+            Scheduler {
+                runtime_ctx: self.clone(),
+            },
+        );
+        self.workers.shared_queue(id).push(task);
+        self.workers.task_counter(id).increase_shared();
+        join
+    }
+
+    pub(crate) fn send_task_to_least_loaded_worker(&self, task: Task) {}
+    pub(crate) fn send_task_at(&self, id: WorkerId, task: Task) {}
 }
