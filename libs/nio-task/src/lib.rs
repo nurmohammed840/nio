@@ -85,6 +85,10 @@ impl<M: Debug> Debug for Metadata<M> {
 }
 
 impl<M> Metadata<M> {
+    pub fn id(&self) -> Id {
+        Id::new(&self.raw)
+    }
+
     pub fn get(&self) -> &M {
         unsafe { &*self.raw.metadata().cast::<M>() }
     }
@@ -209,7 +213,7 @@ impl<M> Task<M> {
                 unsafe { self.map_unchecked_mut(|c| &mut *c.inner).poll(cx) }
             }
         }
-        
+
         let future = Checked {
             id: thread_id(),
             inner: ManuallyDrop::new(future),

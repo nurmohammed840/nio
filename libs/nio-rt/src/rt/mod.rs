@@ -9,7 +9,7 @@ use std::{sync::Arc, thread};
 
 use nio_threadpool::ThreadPool;
 
-use context::RuntimeContext;
+use context::{LocalContext, RuntimeContext};
 use worker::Workers;
 
 impl RuntimeBuilder {
@@ -47,16 +47,29 @@ impl Runtime {
         thread
     }
 
-    pub fn block_on(self) {
+    pub fn block_on<Fut>(self, fut: Fut)
+    where
+        Fut: Future + 'static,
+        Fut::Output: 'static,
+    {
         let event_interval = self.config.event_interval;
         for id in 1..self.config.worker_threads {
-            let runtime = self.context.clone();
+            let runtime_ctx = self.context.clone();
             self.create_thread(id)
-                .spawn(move || Workers::job(runtime.workers.id(id), event_interval, runtime))
+                .spawn(move || {
+                    Workers::job(
+                        LocalContext::new(runtime_ctx.workers.id(id), 512, runtime_ctx),
+                        event_interval,
+                    )
+                })
                 .unwrap_or_else(|err| panic!("failed to spawn worker thread {id}; {err}"));
         }
+
         drop(self.config);
 
-        Workers::job(self.context.workers.id(0), event_interval, self.context)
+        Workers::job(
+            LocalContext::new(self.context.workers.id(0), 512, self.context),
+            event_interval,
+        );
     }
 }

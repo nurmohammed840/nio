@@ -1,5 +1,5 @@
 use super::*;
-use std::sync::Arc;
+use std::{rc::Rc, sync::Arc};
 
 use crossbeam_queue::SegQueue;
 
@@ -65,10 +65,9 @@ impl Workers {
         }
     }
 
-    pub fn job(id: WorkerId, tick: u32, runtime_ctx: Arc<RuntimeContext>) {
-        let context = LocalContext::new(id, 512, runtime_ctx);
+    pub fn job(context: Rc<LocalContext>, tick: u32) {
         context.clone().init();
-
+        
         let task_counter = context.task_counter();
 
         let mut tick = Tick(tick);
