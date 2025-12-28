@@ -100,7 +100,7 @@ impl<Task: Runnable> ThreadPool<Task> {
             return;
         }
 
-        let b = thread_builder(&self);
+        let b = thread_builder(self);
         self.spawn(b)
             .expect("failed to spawn a thread in thread pool");
     }

@@ -1,11 +1,10 @@
 #![allow(unused)]
 mod context;
-mod local_context;
 mod task;
 mod task_counter;
 mod worker;
 
-use crate::{RuntimeConfig, rt::worker::WorkerId};
+use crate::{RuntimeBuilder, rt::worker::WorkerId};
 use std::{sync::Arc, thread};
 
 use nio_threadpool::ThreadPool;
@@ -13,7 +12,7 @@ use nio_threadpool::ThreadPool;
 use context::RuntimeContext;
 use worker::Workers;
 
-impl RuntimeConfig {
+impl RuntimeBuilder {
     pub fn rt(mut self) -> Runtime {
         let context = Arc::new(RuntimeContext {
             workers: Workers::new(self.worker_threads),
@@ -31,7 +30,7 @@ impl RuntimeConfig {
 }
 
 pub struct Runtime {
-    config: RuntimeConfig,
+    config: RuntimeBuilder,
     context: Arc<RuntimeContext>,
 }
 
@@ -53,11 +52,11 @@ impl Runtime {
         for id in 1..self.config.worker_threads {
             let runtime = self.context.clone();
             self.create_thread(id)
-                .spawn(move || Workers::job(unsafe { WorkerId::new(id) }, event_interval, runtime))
-                .expect(&format!("failed to spawn worker thread: {id}"));
+                .spawn(move || Workers::job(runtime.workers.id(id), event_interval, runtime))
+                .unwrap_or_else(|err| panic!("failed to spawn worker thread {id}; {err}"));
         }
         drop(self.config);
 
-        Workers::job(unsafe { WorkerId::new(0) }, event_interval, self.context)
+        Workers::job(self.context.workers.id(0), event_interval, self.context)
     }
 }

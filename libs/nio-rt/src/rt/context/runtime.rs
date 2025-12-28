@@ -1,8 +1,4 @@
-use crate::rt::worker::WorkerId;
-
 use super::*;
-use task::*;
-use worker::SharedQueue;
 
 pub struct RuntimeContext {
     pub(crate) workers: Workers,
@@ -10,6 +6,25 @@ pub struct RuntimeContext {
 }
 
 impl RuntimeContext {
+    pub fn with<F, R>(f: F) -> R
+    where
+        F: FnOnce(&Arc<RuntimeContext>) -> R,
+    {
+        Context::get(|ctx| match ctx {
+            Context::None => panic!("no `Nio` runtime available"),
+            Context::Global(ctx) => f(ctx),
+            Context::Local(ctx) => f(&ctx.runtime_ctx),
+        })
+    }
+
+    pub fn current() -> Arc<RuntimeContext> {
+        RuntimeContext::with(Arc::clone)
+    }
+
+    pub fn enter(self: Arc<Self>) {
+        Context::enter(self);
+    }
+
     pub fn spawn_blocking<F, R>(&self, f: F) -> JoinHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,
@@ -34,7 +49,7 @@ impl RuntimeContext {
                 runtime_ctx: self.clone(),
             },
         );
-        let id = self.workers.least_loaded_worker_index();
+        let id = self.workers.least_loaded_worker_id();
         self.workers.shared_queue(id).push(task);
         self.workers.task_counter(id).increase_shared();
         join
@@ -46,7 +61,7 @@ impl RuntimeContext {
         Fut: Future + 'static,
         Fut::Output: 'static,
     {
-        self._spawn_pinned_at(self.workers.create_id(id), future)
+        self._spawn_pinned_at(self.workers.id(id), future)
     }
 
     pub fn spawn_pinned<F, Fut>(self: &Arc<Self>, future: F) -> JoinHandle<Fut::Output>
@@ -55,7 +70,7 @@ impl RuntimeContext {
         Fut: Future + 'static,
         Fut::Output: 'static,
     {
-        let id = self.workers.least_loaded_worker_index();
+        let id = self.workers.least_loaded_worker_id();
         self._spawn_pinned_at(id, future)
     }
 

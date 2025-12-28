@@ -3,7 +3,7 @@ mod utils;
 
 use std::time::Duration;
 
-pub struct RuntimeConfig {
+pub struct RuntimeBuilder {
     worker_threads: u8,
     worker_stack_size: Option<usize>,
     worker_name: Box<dyn Fn(u8) -> String>,
@@ -16,7 +16,7 @@ pub struct RuntimeConfig {
     thread_timeout: Option<Duration>,
 }
 
-impl Default for RuntimeConfig {
+impl Default for RuntimeBuilder {
     fn default() -> Self {
         Self {
             worker_threads: std::thread::available_parallelism()
@@ -37,8 +37,8 @@ impl Default for RuntimeConfig {
     }
 }
 
-impl RuntimeConfig {
-    pub fn new() -> RuntimeConfig {
+impl RuntimeBuilder {
+    pub fn new() -> RuntimeBuilder {
         Self::default()
     }
 

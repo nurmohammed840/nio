@@ -3,7 +3,10 @@ use std::sync::Arc;
 pub use nio_task::{JoinHandle, Status};
 use nio_threadpool::Runnable;
 
-use super::{context::RuntimeContext, local_context::LocalContext, worker::WorkerId};
+use super::{
+    context::{Context, RuntimeContext},
+    worker::WorkerId,
+};
 
 pub enum TaskKind {
     Sendable,
@@ -25,9 +28,9 @@ impl nio_task::Scheduler<Metadata> for Scheduler {
         match task.metadata().kind {
             TaskKind::Sendable => self.runtime_ctx.send_task_to_least_loaded_worker(task),
             TaskKind::Pinned(id) => {
-                LocalContext::try_with(|ctx| match ctx {
-                    Some(ctx) if ctx.worker_id == id => ctx.add_task_to_local_queue(task),
-                    None | Some(_) => self.runtime_ctx.send_task_at(id, task),
+                Context::get(|ctx| match ctx {
+                    Context::Local(ctx) if ctx.worker_id == id => ctx.add_task_to_local_queue(task),
+                    _ => self.runtime_ctx.send_task_at(id, task),
                 });
             }
         }
