@@ -31,7 +31,7 @@ impl<T> JoinHandle<T> {
         AbortHandle::new(self.raw.clone())
     }
 
-    pub fn abort(&self) {
+    pub fn abort(self) {
         unsafe { self.raw.clone().abort_task() };
     }
 

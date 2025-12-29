@@ -8,32 +8,31 @@ use super::{
     worker::WorkerId,
 };
 
-pub enum TaskKind {
-    Sendable,
-    Pinned(WorkerId),
-}
-
-pub struct Metadata {
-    pub kind: TaskKind,
-}
-
-pub type Task = nio_task::Task<Metadata>;
+pub type Task = nio_task::Task<()>;
 
 pub struct Scheduler {
     pub runtime_ctx: Arc<RuntimeContext>,
 }
 
-impl nio_task::Scheduler<Metadata> for Scheduler {
+pub struct LocalScheduler {
+    pub pinned: WorkerId,
+    pub runtime_ctx: Arc<RuntimeContext>,
+}
+
+impl nio_task::Scheduler for Scheduler {
     fn schedule(&self, task: Task) {
-        match task.metadata().kind {
-            TaskKind::Sendable => self.runtime_ctx.send_task_to_least_loaded_worker(task),
-            TaskKind::Pinned(id) => {
-                Context::get(|ctx| match ctx {
-                    Context::Local(ctx) if ctx.worker_id == id => ctx.add_task_to_local_queue(task),
-                    _ => self.runtime_ctx.send_task_at(id, task),
-                });
+        self.runtime_ctx.send_task_to_least_loaded_worker(task);
+    }
+}
+
+impl nio_task::Scheduler for LocalScheduler {
+    fn schedule(&self, task: Task) {
+        Context::get(|ctx| match ctx {
+            Context::Local(ctx) if self.pinned == ctx.worker_id => {
+                ctx.add_task_to_local_queue(task)
             }
-        }
+            _ => self.runtime_ctx.send_task_at(self.pinned, task),
+        });
     }
 }
 

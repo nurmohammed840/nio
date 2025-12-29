@@ -58,7 +58,7 @@ impl<T> Task<T> {
 
     pub async fn cancel(mut self) -> Option<T> {
         let join = self.join.take().unwrap();
-        join.abort();
+        join.abort_handle().abort();
         join.await.ok()
     }
 }

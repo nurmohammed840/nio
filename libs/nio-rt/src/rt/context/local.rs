@@ -1,7 +1,7 @@
 use super::*;
+use task::*;
 
 use std::{cell::UnsafeCell, collections::VecDeque, rc::Rc};
-use task::{JoinHandle, Metadata, Scheduler, Task, TaskKind};
 use task_counter::{Counter, TaskCounter};
 use worker::{SharedQueue, WorkerId};
 
@@ -46,12 +46,10 @@ impl LocalContext {
         Fut: Future + 'static,
         Fut::Output: 'static,
     {
-        let (task, join) = Task::new_local_with(
-            Metadata {
-                kind: TaskKind::Pinned(self.worker_id),
-            },
+        let (task, join) = Task::new_local(
             future,
-            Scheduler {
+            LocalScheduler {
+                pinned: self.worker_id,
                 runtime_ctx: self.runtime_ctx.clone(),
             },
         );

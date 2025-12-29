@@ -31,7 +31,7 @@ use std::{
     task::{Context, Poll, Wake, Waker},
 };
 
-pub trait Scheduler<M>: 'static {
+pub trait Scheduler<M = ()>: 'static {
     fn schedule(&self, task: Task<M>);
 }
 

@@ -1,4 +1,5 @@
 use super::*;
+use task::*;
 
 pub struct RuntimeContext {
     pub(crate) workers: Workers,
@@ -40,10 +41,7 @@ impl RuntimeContext {
         F: Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        let (task, join) = Task::new_with(
-            Metadata {
-                kind: TaskKind::Sendable,
-            },
+        let (task, join) = Task::new(
             future,
             Scheduler {
                 runtime_ctx: self.clone(),
@@ -79,12 +77,10 @@ impl RuntimeContext {
         F: FnOnce() -> Fut,
         Fut: Future + 'static,
     {
-        let (task, join) = Task::new_local_with(
-            Metadata {
-                kind: TaskKind::Pinned(id),
-            },
+        let (task, join) = Task::new_local(
             fut(),
-            Scheduler {
+            LocalScheduler {
+                pinned: id,
                 runtime_ctx: self.clone(),
             },
         );
