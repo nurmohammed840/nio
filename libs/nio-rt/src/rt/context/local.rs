@@ -46,13 +46,7 @@ impl LocalContext {
         Fut: Future + 'static,
         Fut::Output: 'static,
     {
-        let (task, join) = Task::new_local(
-            future,
-            LocalScheduler {
-                pinned: self.worker_id,
-                runtime_ctx: self.runtime_ctx.clone(),
-            },
-        );
+        let (task, join) = LocalScheduler::spawn(self.worker_id, self.runtime_ctx.clone(), future);
         self.add_task_to_local_queue(task);
         join
     }
@@ -62,7 +56,6 @@ impl LocalContext {
     ///
     /// In particular, `local_queue(..)` must **not** be called:
     /// - Recursively
-    /// - From nested closures
     /// - Indirectly via another function while a queue reference is active.
     ///
     /// Violating this rule may results in **undefined behavior**.

@@ -7,6 +7,7 @@ pub struct RuntimeContext {
 }
 
 impl RuntimeContext {
+    #[doc(hidden)]
     pub fn with<F, R>(f: F) -> R
     where
         F: FnOnce(&Arc<RuntimeContext>) -> R,
@@ -31,7 +32,7 @@ impl RuntimeContext {
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
-        let (task, join) = BlockingTask::new(f);
+        let (task, join) = BlockingTask::spawn(f);
         self.threadpool.execute(task);
         join
     }
@@ -41,12 +42,7 @@ impl RuntimeContext {
         F: Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        let (task, join) = Task::new(
-            future,
-            Scheduler {
-                runtime_ctx: self.clone(),
-            },
-        );
+        let (task, join) = Scheduler::spawn(self.clone(), future);
         let id = self.workers.least_loaded_worker_id();
         self.workers.shared_queue(id).push(task);
         self.workers.task_counter(id).increase_shared();
@@ -77,13 +73,7 @@ impl RuntimeContext {
         F: FnOnce() -> Fut,
         Fut: Future + 'static,
     {
-        let (task, join) = Task::new_local(
-            fut(),
-            LocalScheduler {
-                pinned: id,
-                runtime_ctx: self.clone(),
-            },
-        );
+        let (task, join) = LocalScheduler::spawn(id, self.clone(), fut());
         self.workers.shared_queue(id).push(task);
         self.workers.task_counter(id).increase_shared();
         join

@@ -108,16 +108,16 @@ pub enum Status<M> {
 }
 
 impl Task {
-    pub fn new<F, S>(future: F, scheduler: S) -> (Self, JoinHandle<F::Output>)
+    pub fn new<F, S>(future: F, scheduler: S) -> (Task, JoinHandle<F::Output>)
     where
         S: Scheduler<()> + Send,
         F: Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        Self::new_with((), future, scheduler)
+        unsafe { Self::new_unchecked((), future, scheduler) }
     }
 
-    pub fn new_local<F, S>(future: F, scheduler: S) -> (Self, JoinHandle<F::Output>)
+    pub fn new_local<F, S>(future: F, scheduler: S) -> (Task, JoinHandle<F::Output>)
     where
         S: Scheduler<()> + Send,
         F: Future + 'static,
@@ -144,12 +144,15 @@ impl<M> Task<M> {
         }
     }
 
-    pub fn new_with<F, S>(meta: M, future: F, scheduler: S) -> (Self, JoinHandle<F::Output>)
+    pub unsafe fn new_unchecked<F, S>(
+        meta: M,
+        future: F,
+        scheduler: S,
+    ) -> (Task<M>, JoinHandle<F::Output>)
     where
-        M: 'static + Send,
-        S: Scheduler<M> + Send,
-        F: Future + Send + 'static,
-        F::Output: Send + 'static,
+        M: 'static,
+        S: Scheduler<M>,
+        F: Future + 'static,
     {
         let raw = Arc::new(RawTaskInner {
             header: Header::new(),
@@ -157,17 +160,30 @@ impl<M> Task<M> {
             meta: UnsafeCell::new(meta),
             scheduler,
         });
-        let join_handle = JoinHandle::new(raw.clone());
         (
             Self {
-                raw: Some(raw),
+                raw: Some(raw.clone()),
                 _meta: PhantomData,
             },
-            join_handle,
+            JoinHandle::new(raw),
         )
     }
 
-    pub fn new_local_with<F, S>(meta: M, future: F, scheduler: S) -> (Self, JoinHandle<F::Output>)
+    pub fn new_with<F, S>(meta: M, future: F, scheduler: S) -> (Task<M>, JoinHandle<F::Output>)
+    where
+        M: 'static + Send,
+        S: Scheduler<M> + Send,
+        F: Future + Send + 'static,
+        F::Output: Send + 'static,
+    {
+        unsafe { Self::new_unchecked(meta, future, scheduler) }
+    }
+
+    pub fn new_local_with<F, S>(
+        meta: M,
+        future: F,
+        scheduler: S,
+    ) -> (Task<M>, JoinHandle<F::Output>)
     where
         M: 'static + Send,
         S: Scheduler<M> + Send,
@@ -208,7 +224,7 @@ impl<M> Task<M> {
         impl<F: Future> Future for Checked<F> {
             type Output = F::Output;
             fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-                debug_assert!(
+                assert!(
                     self.id == thread_id(),
                     "local task polled by a thread that didn't spawn it"
                 );
@@ -221,20 +237,7 @@ impl<M> Task<M> {
             inner: ManuallyDrop::new(future),
         };
 
-        let raw = Arc::new(RawTaskInner {
-            header: Header::new(),
-            future: UnsafeCell::new(Fut::Future(future)),
-            meta: UnsafeCell::new(meta),
-            scheduler,
-        });
-        let join_handle = JoinHandle::new(raw.clone());
-        (
-            Self {
-                raw: Some(raw),
-                _meta: PhantomData,
-            },
-            join_handle,
-        )
+        unsafe { Self::new_unchecked(meta, future, scheduler) }
     }
 
     #[inline]
