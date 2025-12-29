@@ -1,6 +1,6 @@
 #![allow(unused)]
-mod context;
-mod task;
+pub mod context;
+pub mod task;
 mod task_counter;
 mod worker;
 

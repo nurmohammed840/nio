@@ -1,7 +1,14 @@
+// pub mod fs;
 pub mod rt;
+
 mod utils;
 
 use std::time::Duration;
+
+pub use rt::Runtime;
+use rt::context::LocalContext;
+pub use rt::context::RuntimeContext;
+pub use rt::task::JoinHandle;
 
 pub struct RuntimeBuilder {
     worker_threads: u8,
@@ -90,4 +97,38 @@ impl RuntimeBuilder {
         self.worker_name = Box::new(f);
         self
     }
+}
+
+pub fn spawn<F>(future: F) -> JoinHandle<F::Output>
+where
+    F: Future + Send + 'static,
+    F::Output: Send + 'static,
+{
+    RuntimeContext::with(|ctx| ctx.spawn(future))
+}
+
+pub fn spawn_pinned<F, Fut>(future: F) -> JoinHandle<Fut::Output>
+where
+    F: FnOnce() -> Fut + Send,
+    Fut: Future + 'static,
+    Fut::Output: Send + 'static,
+{
+    RuntimeContext::with(|ctx| ctx.spawn_pinned(future))
+}
+
+pub fn spawn_pinned_at<F, Fut>(worker: u8, future: F) -> JoinHandle<Fut::Output>
+where
+    F: FnOnce() -> Fut + Send,
+    Fut: Future + 'static,
+    Fut::Output: Send + 'static,
+{
+    RuntimeContext::with(|ctx| ctx.spawn_pinned_at(worker, future))
+}
+
+pub fn spawn_local<Fut>(future: Fut) -> JoinHandle<Fut::Output>
+where
+    Fut: Future + 'static,
+    Fut::Output: 'static,
+{
+    LocalContext::with(|ctx| ctx.spawn_local(future))
 }

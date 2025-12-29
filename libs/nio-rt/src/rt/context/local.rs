@@ -16,7 +16,7 @@ impl LocalContext {
         Context::init(self);
     }
 
-    pub fn local<F, R>(f: F) -> R
+    pub fn with<F, R>(f: F) -> R
     where
         F: FnOnce(&Rc<LocalContext>) -> R,
     {
