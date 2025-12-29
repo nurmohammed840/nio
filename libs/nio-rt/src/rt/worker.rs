@@ -35,7 +35,7 @@ impl Workers {
         WorkerId(id)
     }
 
-    pub fn least_loaded_worker_id(&self) -> WorkerId {
+    pub fn least_loaded_worker(&self) -> WorkerId {
         unsafe {
             // Safety: `task_counters` is not empty
             let id = crate::utils::min_index_by_key(&self.task_counters, |counter| {

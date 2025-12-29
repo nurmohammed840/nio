@@ -43,9 +43,7 @@ impl RuntimeContext {
         F::Output: Send + 'static,
     {
         let (task, join) = Scheduler::spawn(self.clone(), future);
-        let id = self.workers.least_loaded_worker_id();
-        self.workers.shared_queue(id).push(task);
-        self.workers.task_counter(id).increase_shared();
+        self.send_task_at(self.workers.least_loaded_worker(), task);
         join
     }
 
@@ -64,8 +62,7 @@ impl RuntimeContext {
         Fut: Future + 'static,
         Fut::Output: Send + 'static,
     {
-        let id = self.workers.least_loaded_worker_id();
-        self._spawn_pinned_at(id, future)
+        self._spawn_pinned_at(self.workers.least_loaded_worker(), future)
     }
 
     fn _spawn_pinned_at<F, Fut>(self: &Arc<Self>, id: WorkerId, fut: F) -> JoinHandle<Fut::Output>
@@ -74,11 +71,16 @@ impl RuntimeContext {
         Fut: Future + 'static,
     {
         let (task, join) = LocalScheduler::spawn(id, self.clone(), fut());
-        self.workers.shared_queue(id).push(task);
-        self.workers.task_counter(id).increase_shared();
+        self.send_task_at(id, task);
         join
     }
 
-    pub(crate) fn send_task_to_least_loaded_worker(&self, task: Task) {}
-    pub(crate) fn send_task_at(&self, id: WorkerId, task: Task) {}
+    pub(crate) fn send_task_to_least_loaded_worker(&self, task: Task) {
+        self.send_task_at(self.workers.least_loaded_worker(), task);
+    }
+
+    pub(crate) fn send_task_at(&self, id: WorkerId, task: Task) {
+        self.workers.shared_queue(id).push(task);
+        self.workers.task_counter(id).increase_shared();
+    }
 }
