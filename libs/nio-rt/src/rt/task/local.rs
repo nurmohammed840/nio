@@ -61,12 +61,29 @@ fn is_same_worker(f: impl FnOnce(WorkerId) -> bool) -> bool {
     })
 }
 
+const ABORT: u8 = 1;
+const PANIC: u8 = 2;
+
+#[cfg(debug_assertions)]
+const DROP_STRATEGY: u8 = ABORT;
+
+#[cfg(not(debug_assertions))]
+const DROP_STRATEGY: u8 = PANIC;
+
 impl<F> Drop for LocalFuture<F> {
     fn drop(&mut self) {
-        assert!(
-            is_same_worker(|id| self.worker_id == id),
-            "local task dropped by a thread that didn't spawn it"
-        );
+        if DROP_STRATEGY == ABORT {
+            if !is_same_worker(|id| self.worker_id == id) {
+                eprintln!("local task dropped by a thread that didn't spawn it");
+                std::process::abort();
+            }
+        }
+        if DROP_STRATEGY == PANIC {
+            assert!(
+                is_same_worker(|id| self.worker_id == id),
+                "local task dropped by a thread that didn't spawn it"
+            );
+        }
         unsafe {
             ManuallyDrop::drop(&mut self.fut);
         }
