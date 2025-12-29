@@ -1,4 +1,4 @@
-// pub mod fs;
+pub mod fs;
 pub mod rt;
 
 mod utils;
@@ -97,6 +97,14 @@ impl RuntimeBuilder {
         self.worker_name = Box::new(f);
         self
     }
+}
+
+pub fn spawn_blocking<F, R>(f: F) -> JoinHandle<R>
+where
+    F: FnOnce() -> R + Send + 'static,
+    R: Send + 'static,
+{
+    RuntimeContext::with(|ctx| ctx.spawn_blocking(f))
 }
 
 pub fn spawn<F>(future: F) -> JoinHandle<F::Output>

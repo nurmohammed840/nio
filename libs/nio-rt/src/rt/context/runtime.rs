@@ -7,8 +7,7 @@ pub struct RuntimeContext {
 }
 
 impl RuntimeContext {
-    #[doc(hidden)]
-    pub fn with<F, R>(f: F) -> R
+    pub(crate) fn with<F, R>(f: F) -> R
     where
         F: FnOnce(&Arc<RuntimeContext>) -> R,
     {

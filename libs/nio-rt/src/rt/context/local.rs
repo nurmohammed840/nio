@@ -6,8 +6,8 @@ use task_counter::{Counter, TaskCounter};
 use worker::{SharedQueue, WorkerId};
 
 pub struct LocalContext {
+    local_queue: UnsafeCell<VecDeque<Task>>,
     pub worker_id: WorkerId,
-    pub local_queue: UnsafeCell<VecDeque<Task>>,
     pub runtime_ctx: Arc<RuntimeContext>,
 }
 
