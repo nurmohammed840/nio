@@ -34,21 +34,22 @@ pub fn nio_main(
     args: TokenStream,
     item_fn: ItemFn,
 ) -> TokenStream {
-    let metadata = match AttributeArgs::parse_terminated.parse2(args) {
+    let _metadata = match AttributeArgs::parse_terminated.parse2(args) {
         Ok(args) => args,
         Err(err) => return err.into_compile_error(),
     };
 
-    if let Some(meta) = metadata.first() {
+    let mut metadata = Vec::new();
+    for meta in _metadata {
         match meta {
             Meta::Path(path) if path.is_ident("crate") => {
                 crate_path = TokenStream::new();
                 quote!(crate_path, { crate });
             }
             Meta::NameValue(MetaNameValue { path, value, .. }) if path.is_ident("crate") => {
-                crate_path = quote2::ToTokens::to_token_stream(value);
+                crate_path = quote2::ToTokens::to_token_stream(&value);
             }
-            _ => {}
+            _ => metadata.push(meta),
         }
     }
 
@@ -59,6 +60,9 @@ pub fn nio_main(
         #[allow(unused)]
         Meta::NameValue(MetaNameValue { path, value, .. }) => {
             quote!(t, { .#path(#value) });
+        }
+        Meta::Path(path) => {
+            quote!(t, { .#path() });
         }
         _ => {}
     });
