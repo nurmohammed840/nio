@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+mio = "1"
 nio-task = { path = "../nio-task", version = "*" }
 nio-future = { path = "../nio-future", version = "*" }
 nio-threadpool = { path = "../nio-threadpool", version = "*" }

@@ -1,5 +1,7 @@
+use crate::driver::{self, Driver};
+
 use super::*;
-use std::{rc::Rc, sync::Arc};
+use std::{io, rc::Rc, sync::Arc};
 
 use crossbeam_queue::SegQueue;
 
@@ -20,6 +22,7 @@ impl WorkerId {
 }
 
 pub struct Workers {
+    wakers: Box<[driver::Waker]>,
     task_counters: Box<[TaskCounter]>,
     shared_queues: Box<[SharedQueue]>,
 }
@@ -47,6 +50,11 @@ impl Workers {
     }
 
     #[inline]
+    pub fn wake(&self, id: WorkerId) {
+        unsafe { self.wakers.get_unchecked(id.get()) }.wake();
+    }
+
+    #[inline]
     pub fn task_counter(&self, id: WorkerId) -> &TaskCounter {
         unsafe { self.task_counters.get_unchecked(id.get()) }
     }
@@ -58,37 +66,52 @@ impl Workers {
 }
 
 impl Workers {
-    pub fn new(count: u8) -> Self {
-        Self {
-            task_counters: (0..count).map(|_| TaskCounter::new()).collect(),
-            shared_queues: (0..count).map(|_| SegQueue::new()).collect(),
+    pub fn new(count: u8) -> io::Result<(Self, Box<[driver::Driver]>)> {
+        let mut drivers = Vec::with_capacity(count as usize);
+        let mut wakers = Vec::with_capacity(count as usize);
+
+        for _ in (0..count) {
+            let (driver, waker) = driver::Driver::with_capacity(1024)?;
+            drivers.push(driver);
+            wakers.push(waker);
         }
+
+        Ok((
+            Self {
+                wakers: wakers.into_boxed_slice(),
+                task_counters: (0..count).map(|_| TaskCounter::new()).collect(),
+                shared_queues: (0..count).map(|_| SegQueue::new()).collect(),
+            },
+            drivers.into_boxed_slice(),
+        ))
     }
 
-    pub fn job(context: Rc<LocalContext>, tick: u32) {
+    pub fn job(context: Rc<LocalContext>, tick: u32, driver: driver::Driver) {
         context.clone().init();
-        
+
         let task_counter = context.task_counter();
 
-        let mut tick = Tick(tick);
-        while !tick.is_complete() {
-            match unsafe { context.local_queue(|q| q.pop_front()) } {
-                Some(task) => match task.poll() {
-                    Status::Yielded(task) => {
-                        unsafe { context.local_queue(|q| q.push_back(task)) };
-                    }
-                    Status::Pending | Status::Complete(_) => {
-                        tick.step();
-                        let counter = task_counter.decrease_local();
-                        context.move_tasks_from_shared_to_local_queue(counter);
-                    }
-                },
-                None => {
-                    let counter = task_counter.load();
-                    if counter.shared_queue_has_data() {
-                        context.move_tasks_from_shared_to_local_queue(counter);
-                    } else {
-                        break;
+        loop {
+            let mut tick = Tick(tick);
+            while !tick.is_complete() {
+                match unsafe { context.local_queue(|q| q.pop_front()) } {
+                    Some(task) => match task.poll() {
+                        Status::Yielded(task) => {
+                            unsafe { context.local_queue(|q| q.push_back(task)) };
+                        }
+                        Status::Pending | Status::Complete(_) => {
+                            tick.step();
+                            let counter = task_counter.decrease_local();
+                            context.move_tasks_from_shared_to_local_queue(counter);
+                        }
+                    },
+                    None => {
+                        let counter = task_counter.load();
+                        if counter.shared_queue_has_data() {
+                            context.move_tasks_from_shared_to_local_queue(counter);
+                        } else {
+                            break;
+                        }
                     }
                 }
             }

@@ -1,7 +1,10 @@
+#![allow(unused)]
+
 pub mod fs;
-pub mod rt;
 
 mod local_waker;
+mod rt;
+mod driver;
 mod timer;
 mod utils;
 
