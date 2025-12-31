@@ -1,0 +1,11 @@
+[package]
+name = "nio-macro"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "2", features = ["full"] }
+quote2 = "0.9"

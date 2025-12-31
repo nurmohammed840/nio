@@ -5,6 +5,7 @@ mod local_waker;
 mod timer;
 mod utils;
 
+pub use nio_macro::*;
 use std::time::Duration;
 
 pub use rt::Runtime;
