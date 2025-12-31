@@ -1,6 +1,8 @@
 pub mod fs;
 pub mod rt;
 
+mod local_waker;
+mod timer;
 mod utils;
 
 use std::time::Duration;

@@ -1,3 +1,5 @@
+use crate::timer::Timers;
+
 use super::*;
 use task::*;
 
@@ -7,6 +9,7 @@ use worker::{SharedQueue, WorkerId};
 
 pub struct LocalContext {
     local_queue: UnsafeCell<VecDeque<Task>>,
+    timers: UnsafeCell<Timers>,
     pub worker_id: WorkerId,
     pub runtime_ctx: Arc<RuntimeContext>,
 }
@@ -30,6 +33,7 @@ impl LocalContext {
     pub fn new(worker_id: WorkerId, cap: usize, runtime_ctx: Arc<RuntimeContext>) -> Rc<Self> {
         Rc::new(Self {
             worker_id,
+            timers: UnsafeCell::new(Timers::new()),
             local_queue: UnsafeCell::new(VecDeque::with_capacity(cap)),
             runtime_ctx,
         })
@@ -92,6 +96,14 @@ impl LocalContext {
         F: FnOnce(&mut VecDeque<Task>) -> R,
     {
         f(unsafe { &mut *self.local_queue.get() })
+    }
+  
+    /// ## See: safety docs [`LocalContext::local_queue`]
+    pub unsafe fn timers<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&mut Timers) -> R,
+    {
+        f(unsafe { &mut *self.timers.get() })
     }
 
     /// Safety: the caller must ensure not to call this funtion in [`LocalContext::local_queue`] closure.
