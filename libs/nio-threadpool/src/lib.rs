@@ -1,5 +1,5 @@
 use mpmc_channel::MPMC;
-use std::{collections::VecDeque, io, sync::Arc, thread, time::Duration};
+use std::{collections::VecDeque, io, num::NonZeroUsize, sync::Arc, thread, time::Duration};
 
 type Channel<Task> = Arc<MPMC<VecDeque<Task>>>;
 
@@ -9,7 +9,7 @@ pub struct ThreadPool<Task: Runnable> {
     // ----- config -----
     max_threads_limit: u16,
     timeout: Option<Duration>,
-    stack_size: usize,
+    stack_size: Option<NonZeroUsize>,
     name: Box<dyn Fn(usize) -> String + Send + Sync>,
 }
 
@@ -20,7 +20,7 @@ impl<T: Runnable> Default for ThreadPool<T> {
 
             timeout: Some(Duration::from_secs(10)),
             max_threads_limit: 512,
-            stack_size: 0,
+            stack_size: None,
             name: Box::new(|id| format!("Worker: {id}")),
         }
     }
@@ -47,8 +47,7 @@ impl<Task: Runnable> ThreadPool<Task> {
     }
 
     pub fn stack_size(mut self, stack_size: usize) -> Self {
-        assert!(stack_size > 0, "stack size must be greater than 0");
-        self.stack_size = stack_size;
+        self.stack_size = NonZeroUsize::new(stack_size);
         self
     }
 
@@ -67,10 +66,7 @@ impl<Task: Runnable> ThreadPool<Task> {
     }
 
     pub fn get_stack_size(&self) -> Option<usize> {
-        if self.stack_size == 0 {
-            return None;
-        }
-        Some(self.stack_size)
+        self.stack_size.map(|size| size.get())
     }
 
     pub fn get_max_threads_limit(&self) -> u16 {

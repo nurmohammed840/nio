@@ -38,7 +38,7 @@ impl Runtime {
     fn create_thread(&self, id: u8) -> thread::Builder {
         let mut thread = thread::Builder::new();
         if let Some(size) = self.config.worker_stack_size {
-            thread = thread.stack_size(size);
+            thread = thread.stack_size(size.get());
         }
         let name = (self.config.worker_name)(id);
         if !name.is_empty() {

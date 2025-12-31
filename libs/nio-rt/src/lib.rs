@@ -6,6 +6,7 @@ mod timer;
 mod utils;
 
 pub use nio_macro::*;
+use std::num::NonZeroUsize;
 use std::time::Duration;
 
 pub use rt::Runtime;
@@ -15,7 +16,7 @@ pub use rt::task::JoinHandle;
 
 pub struct RuntimeBuilder {
     worker_threads: u8,
-    worker_stack_size: Option<usize>,
+    worker_stack_size: Option<NonZeroUsize>,
     worker_name: Box<dyn Fn(u8) -> String>,
 
     event_interval: u32,
@@ -59,8 +60,7 @@ impl RuntimeBuilder {
     }
 
     pub fn worker_stack_size(mut self, size: usize) -> Self {
-        assert!(size > 0);
-        self.worker_stack_size = Some(size);
+        self.worker_stack_size = NonZeroUsize::new(size);
         self
     }
 

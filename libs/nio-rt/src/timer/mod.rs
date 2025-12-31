@@ -138,8 +138,9 @@ impl Timers {
 
 impl fmt::Debug for Timer {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let deadline = self.deadline.get().duration_since(Instant::now());
         f.debug_struct("Timer")
-            .field("deadline", &self.deadline)
+            .field("deadline", &deadline)
             .field("state", &self.state.get())
             .finish()
     }
