@@ -1,3 +1,4 @@
+mod interval;
 mod sleep;
 mod timeout;
 
@@ -23,15 +24,9 @@ struct TimerEntry {
     timer: *const Timer,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum State {
-    None,
-    Notified,
-}
-
 pub struct Timer {
     deadline: Cell<Instant>,
-    state: Cell<State>,
+    notified: Cell<bool>,
     waker: LocalWaker,
 }
 
@@ -39,7 +34,7 @@ impl Timer {
     pub fn new(deadline: Instant) -> Self {
         Self {
             deadline: Cell::new(deadline),
-            state: Cell::new(State::None),
+            notified: Cell::new(false),
             waker: LocalWaker::new(),
         }
     }
@@ -91,7 +86,7 @@ impl Timers {
         }
     }
 
-    fn reset(&mut self, timer: &Timer, new_deadline: Instant) {
+    fn reset_at(&mut self, timer: &Timer, new_deadline: Instant) {
         if let Some((entry, _)) = self.entries.remove_entry(&TimerEntry { timer }) {
             entry.timer_ref().deadline.set(new_deadline);
             self.entries.insert(entry, ());
@@ -100,13 +95,17 @@ impl Timers {
 
     fn sleep_at(&mut self, deadline: Instant) -> Sleep {
         let timer = Rc::new(Timer::new(deadline));
+        self.insert_entry(timer.clone());
+        Sleep { timer }
+    }
+
+    fn insert_entry(&mut self, timer: Rc<Timer>) {
         self.entries.insert(
             TimerEntry {
-                timer: Rc::into_raw(timer.clone()),
+                timer: Rc::into_raw(timer),
             },
             (),
         );
-        Sleep { timer }
     }
 
     pub fn next_timeout(&self, since: Instant) -> Option<Duration> {
@@ -130,7 +129,7 @@ impl Timers {
     pub fn notify_all(self) {
         for (entry, _) in self.entries {
             let timer = entry.timer();
-            timer.state.set(State::Notified);
+            timer.notified.set(true);
             timer.waker.wake();
         }
     }
@@ -141,7 +140,7 @@ impl fmt::Debug for Timer {
         let deadline = self.deadline.get().duration_since(Instant::now());
         f.debug_struct("Timer")
             .field("deadline", &deadline)
-            .field("state", &self.state.get())
+            .field("state", &self.notified.get())
             .finish()
     }
 }

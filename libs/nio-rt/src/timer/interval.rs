@@ -1,0 +1,88 @@
+use crate::{rt::context::LocalContext, timer::sleep::Sleep};
+use std::{
+    future::poll_fn,
+    ops::{Deref, DerefMut},
+    task::{Context, Poll},
+    time::{Duration, Instant},
+};
+
+#[derive(Debug)]
+struct Interval {
+    delay: Sleep,
+    period: Duration,
+}
+
+impl Interval {
+    #[inline]
+    fn at(deadline: Instant, period: Duration) -> Interval {
+        Interval {
+            delay: Sleep::at(deadline),
+            period,
+        }
+    }
+
+    fn period(&self) -> Duration {
+        self.period
+    }
+
+    fn set_period(&mut self, period: Duration) {
+        self.period = period;
+    }
+
+    pub async fn tick(&mut self) {
+        poll_fn(|cx| self.poll(cx)).await
+    }
+
+    pub fn poll(&mut self, cx: &mut Context<'_>) -> Poll<()> {
+        self.delay.timer.waker.register(cx);
+
+        if self.delay.is_elapsed() {
+            let timer = self.delay.timer.clone();
+            timer.notified.set(false);
+            timer.deadline.set(timer.deadline.get() + self.period);
+            LocalContext::with(|ctx| unsafe { ctx.timers(|timers| timers.insert_entry(timer)) });
+
+            return Poll::Ready(());
+        }
+        Poll::Pending
+    }
+}
+
+fn interval(period: Duration) -> Interval {
+    Interval::at(Instant::now(), period)
+}
+
+impl Deref for Interval {
+    type Target = Sleep;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.delay
+    }
+}
+
+impl DerefMut for Interval {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.delay
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use crate::timer::sleep::sleep;
+
+    use super::*;
+
+    #[crate::test(crate)]
+    async fn test_sname() {
+        let mut interval = interval(Duration::from_secs(1));
+
+        for _ in 0..5 {
+            interval.tick().await;
+            // sleep(Duration::from_secs(1)).await;
+            println!("sad")
+        }
+    }
+}

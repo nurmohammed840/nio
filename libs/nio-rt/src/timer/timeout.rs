@@ -1,5 +1,6 @@
-use crate::timer::sleep::{Sleep, sleep};
+use crate::timer::sleep::Sleep;
 use std::{
+    fmt,
     ops::{Deref, DerefMut},
     pin::Pin,
     task::{Context, Poll},
@@ -12,16 +13,6 @@ pub struct Timeout<T> {
 }
 
 impl<T> Timeout<T> {
-    pub fn new<F>(duration: Duration, future: F) -> Timeout<F::IntoFuture>
-    where
-        F: IntoFuture,
-    {
-        Timeout {
-            delay: Sleep::new(duration),
-            fut: future.into_future(),
-        }
-    }
-
     pub fn at<F>(deadline: Instant, future: F) -> Timeout<F::IntoFuture>
     where
         F: IntoFuture,
@@ -45,6 +36,13 @@ impl<T> Timeout<T> {
     pub fn into_inner(self) -> T {
         self.fut
     }
+}
+
+pub fn timeout<F>(duration: Duration, future: F) -> Timeout<F::IntoFuture>
+where
+    F: IntoFuture,
+{
+    Timeout::<F::IntoFuture>::at(Instant::now() + duration, future)
 }
 
 impl<T: Future> Future for Timeout<T> {
@@ -78,5 +76,11 @@ impl<T> DerefMut for Timeout<T> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.delay
+    }
+}
+
+impl<T> fmt::Debug for Timeout<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("Timeout").field(&self.delay).finish()
     }
 }

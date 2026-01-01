@@ -98,13 +98,12 @@ pub fn nio_main(
             #attrs
             #test_attr
             #vis #sig {
-                let body = #async_keyword #body;
-
                 #crate_path::RuntimeBuilder::new()
                     #test_config
                     #config
                     .rt()
-                    .block_on(body)
+                    .unwrap()
+                    .block_on(|| #async_keyword #body)
             }
         });
     } else {
@@ -129,7 +128,8 @@ pub fn nio_main(
                     #test_config
                     #config
                     .rt()
-                    .block_on(#name(#args))
+                    .unwrap()
+                    .block_on(|| #name(#args))
             }
         });
     }

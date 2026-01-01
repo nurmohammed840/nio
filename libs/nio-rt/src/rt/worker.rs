@@ -126,7 +126,12 @@ impl Workers {
                 context.timers(|timer| {
                     let now = Instant::now();
                     let done = timer.fetch(now);
-                    (done, timer.next_timeout(now))
+                    let timeout = if done.is_some() {
+                        Some(Duration::from_secs(0))
+                    } else {
+                        timer.next_timeout(now)
+                    };
+                    (done, timeout)
                 })
             };
 

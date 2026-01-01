@@ -38,9 +38,10 @@ pub struct Runtime {
 }
 
 impl Runtime {
-    pub fn block_on<Fut>(self, fut: Fut) -> Fut::Output
+    pub fn block_on<F, Fut>(self, fut: F) -> Fut::Output
     where
-        Fut: Future + Send + 'static,
+        F: FnOnce() -> Fut + Send,
+        Fut: Future + 'static,
         Fut::Output: Send + 'static,
     {
         let Runtime {
@@ -71,7 +72,7 @@ impl Runtime {
         }
 
         drop(config);
-        nio_future::block_on(context.spawn_pinned_at(0, || fut)).unwrap()
+        nio_future::block_on(context.spawn_pinned_at(0, fut)).unwrap()
     }
 }
 
