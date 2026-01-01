@@ -1,7 +1,12 @@
 use crate::driver::{self, Driver};
 
 use super::*;
-use std::{io, rc::Rc, sync::Arc};
+use std::{
+    io,
+    rc::Rc,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use crossbeam_queue::SegQueue;
 
@@ -66,12 +71,12 @@ impl Workers {
 }
 
 impl Workers {
-    pub fn new(count: u8) -> io::Result<(Self, Box<[driver::Driver]>)> {
+    pub fn new(count: u8) -> io::Result<(Self, Box<[Driver]>)> {
         let mut drivers = Vec::with_capacity(count as usize);
         let mut wakers = Vec::with_capacity(count as usize);
 
         for _ in (0..count) {
-            let (driver, waker) = driver::Driver::with_capacity(1024)?;
+            let (driver, waker) = Driver::with_capacity(1024)?;
             drivers.push(driver);
             wakers.push(waker);
         }
@@ -86,14 +91,15 @@ impl Workers {
         ))
     }
 
-    pub fn job(context: Rc<LocalContext>, tick: u32, driver: driver::Driver) {
+    pub fn job(context: Rc<LocalContext>, tick: u32, mut driver: Driver) {
+        debug_assert_ne!(tick, 0);
         context.clone().init();
 
         let task_counter = context.task_counter();
 
         loop {
             let mut tick = Tick(tick);
-            while !tick.is_complete() {
+            'event_interval: while tick.has_steps_left() {
                 match unsafe { context.local_queue(|q| q.pop_front()) } {
                     Some(task) => match task.poll() {
                         Status::Yielded(task) => {
@@ -110,20 +116,50 @@ impl Workers {
                         if counter.shared_queue_has_data() {
                             context.move_tasks_from_shared_to_local_queue(counter);
                         } else {
-                            break;
+                            break 'event_interval;
                         }
                     }
+                }
+            }
+
+            let (timers, timeout) = unsafe {
+                context.timers(|timer| {
+                    let now = Instant::now();
+                    let done = timer.fetch(now);
+                    (done, timer.next_timeout(now))
+                })
+            };
+
+            if let Some(timers) = timers {
+                timers.notify_all();
+            }
+
+            let events = match driver.poll(timeout) {
+                Ok(events) => events,
+                Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
+                #[cfg(target_os = "wasi")]
+                Err(e) if e.kind() == io::ErrorKind::InvalidInput => {
+                    // In case of wasm32_wasi this error happens, when trying to poll without subscriptions
+                    // just return from the park, as there would be nothing, which wakes us up.
+                    continue;
+                }
+                Err(e) => panic!("unexpected error when polling the I/O driver: {e:?}"),
+            };
+
+            for ev in events {
+                if Driver::has_woken(ev) {
+                    continue;
                 }
             }
         }
     }
 }
 
-struct Tick(pub u32);
+struct Tick(u32);
 
 impl Tick {
-    fn is_complete(&self) -> bool {
-        self.0 == 0
+    fn has_steps_left(&self) -> bool {
+        self.0 > 0
     }
     fn step(&mut self) {
         self.0 -= 1;

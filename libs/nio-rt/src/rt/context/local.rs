@@ -13,6 +13,7 @@ pub struct LocalContext {
 
     pub worker_id: WorkerId,
     pub runtime_ctx: Arc<RuntimeContext>,
+    pub io_registry: driver::Registry,
 }
 
 impl LocalContext {
@@ -31,13 +32,20 @@ impl LocalContext {
         })
     }
 
-    pub fn new(worker_id: WorkerId, cap: usize, runtime_ctx: Arc<RuntimeContext>) -> Rc<Self> {
-        Rc::new(Self {
+    pub fn new(
+        worker_id: WorkerId,
+        cap: usize,
+        runtime_ctx: Arc<RuntimeContext>,
+        io_registry: driver::Registry,
+    ) -> Rc<Self> {
+        LocalContext {
             worker_id,
             timers: UnsafeCell::new(Timers::new()),
             local_queue: UnsafeCell::new(VecDeque::with_capacity(cap)),
             runtime_ctx,
-        })
+            io_registry,
+        }
+        .into()
     }
 
     pub fn add_task_to_local_queue(&self, task: Task) {
@@ -98,7 +106,7 @@ impl LocalContext {
     {
         f(unsafe { &mut *self.local_queue.get() })
     }
-  
+
     /// ## See: safety docs [`LocalContext::local_queue`]
     pub unsafe fn timers<F, R>(&self, f: F) -> R
     where

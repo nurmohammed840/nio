@@ -22,7 +22,7 @@ impl RuntimeBuilder {
                 .timeout(self.thread_timeout)
                 .name(self.thread_name.take().unwrap()),
         });
-        
+
         Ok(Runtime {
             context,
             config: self,
@@ -60,8 +60,9 @@ impl Runtime {
             config
                 .create_thread(id)
                 .spawn(move || {
+                    let io_registry = driver.registry_owned().unwrap();
                     Workers::job(
-                        LocalContext::new(worker_id, local_queue_cap, context),
+                        LocalContext::new(worker_id, local_queue_cap, context, io_registry),
                         event_interval,
                         driver,
                     )
