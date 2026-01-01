@@ -6,11 +6,21 @@ use std::{
     task::{Context, Poll},
 };
 
+#[derive(Debug)]
 pub struct Sleep {
     pub(crate) timer: Rc<Timer>,
 }
 
 impl Sleep {
+    #[inline]
+    pub fn new(duration: Duration) -> Sleep {
+        Sleep::at(Instant::now() + duration)
+    }
+
+    pub fn at(deadline: Instant) -> Sleep {
+        LocalContext::with(|ctx| unsafe { ctx.timers(|timers| timers.sleep_at(deadline)) })
+    }
+
     #[inline]
     pub fn deadline(&self) -> Instant {
         self.timer.deadline.get()
@@ -28,8 +38,9 @@ impl Sleep {
     }
 }
 
+#[inline]
 pub fn sleep(duration: Duration) -> Sleep {
-    LocalContext::with(|ctx| unsafe { ctx.timers(|timers| timers.sleep(duration)) })
+    Sleep::new(duration)
 }
 
 impl Future for Sleep {

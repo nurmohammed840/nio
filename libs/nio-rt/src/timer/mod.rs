@@ -1,4 +1,5 @@
 mod sleep;
+mod timeout;
 
 use std::{
     cell::Cell,
@@ -70,7 +71,7 @@ impl TimerEntry {
         unsafe { (*self.timer).deadline.get() }
     }
 
-    fn timer_as_ref(&self) -> &Timer {
+    fn timer_ref(&self) -> &Timer {
         unsafe { &*self.timer }
     }
 
@@ -92,13 +93,12 @@ impl Timers {
 
     fn reset(&mut self, timer: &Timer, new_deadline: Instant) {
         if let Some((entry, _)) = self.entries.remove_entry(&TimerEntry { timer }) {
-            entry.timer_as_ref().deadline.set(new_deadline);
+            entry.timer_ref().deadline.set(new_deadline);
             self.entries.insert(entry, ());
         }
     }
 
-    fn sleep(&mut self, dur: Duration) -> Sleep {
-        let deadline = Instant::now() + dur;
+    fn sleep_at(&mut self, deadline: Instant) -> Sleep {
         let timer = Rc::new(Timer::new(deadline));
         self.entries.insert(
             TimerEntry {
