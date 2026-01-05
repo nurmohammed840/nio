@@ -1,4 +1,6 @@
-#![allow(dead_code)]
+mod io;
+mod async_io;
+
 use std::{io::Result, time::Duration};
 
 pub use mio::{Events, Registry, Waker, event::Event};
