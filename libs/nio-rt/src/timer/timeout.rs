@@ -1,4 +1,4 @@
-use crate::timer::sleep::Sleep;
+use crate::timer::sleep::{Sleep, sleep};
 use std::{
     fmt,
     ops::{Deref, DerefMut},
@@ -42,7 +42,10 @@ pub fn timeout<F>(duration: Duration, future: F) -> Timeout<F::IntoFuture>
 where
     F: IntoFuture,
 {
-    Timeout::<F::IntoFuture>::at(Instant::now() + duration, future)
+    Timeout {
+        delay: sleep(duration),
+        fut: future.into_future(),
+    }
 }
 
 impl<T: Future> Future for Timeout<T> {

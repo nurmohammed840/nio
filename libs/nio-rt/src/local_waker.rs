@@ -20,10 +20,9 @@ impl LocalWaker {
 
     pub fn register(&self, cx: &mut Context<'_>) {
         let waker = cx.waker();
-        if let Some(prev) = unsafe { &*self.waker.get() } {
-            if waker.will_wake(prev) {
-                return;
-            }
+        match unsafe { &*self.waker.get() } {
+            Some(old) if waker.will_wake(old) => return,
+            _ => {}
         }
         unsafe { *self.waker.get() = Some(waker.clone()) }
     }

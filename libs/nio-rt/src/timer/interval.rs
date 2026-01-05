@@ -1,4 +1,7 @@
-use crate::{rt::context::LocalContext, timer::sleep::Sleep};
+use crate::{
+    rt::context::LocalContext,
+    timer::sleep::{Sleep, sleep},
+};
 use std::{
     future::poll_fn,
     ops::{Deref, DerefMut},
@@ -38,9 +41,13 @@ impl Interval {
 
         if self.delay.is_elapsed() {
             let timer = self.delay.timer.clone();
-            timer.notified.set(false);
-            timer.deadline.set(timer.deadline.get() + self.period);
-            LocalContext::with(|ctx| unsafe { ctx.timers(|timers| timers.insert_entry(timer)) });
+            LocalContext::with(|ctx| unsafe {
+                ctx.timers(|timers| {
+                    timer.notified.set(false);
+                    timer.deadline.set(timers.clock.current() + self.period);
+                    timers.insert_entry(timer)
+                })
+            });
 
             return Poll::Ready(());
         }
@@ -49,7 +56,10 @@ impl Interval {
 }
 
 fn interval(period: Duration) -> Interval {
-    Interval::at(Instant::now(), period)
+    Interval {
+        delay: sleep(Duration::ZERO),
+        period,
+    }
 }
 
 impl Deref for Interval {

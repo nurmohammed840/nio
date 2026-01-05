@@ -124,10 +124,10 @@ impl Workers {
 
             let (timers, timeout) = unsafe {
                 context.timers(|timer| {
-                    let now = Instant::now();
+                    let now = timer.clock.now();
                     let done = timer.fetch(now);
                     let timeout = if done.is_some() {
-                        Some(Duration::from_secs(0))
+                        Some(Duration::ZERO)
                     } else {
                         timer.next_timeout(now)
                     };

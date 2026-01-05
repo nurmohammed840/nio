@@ -22,7 +22,7 @@ impl Sleep {
 
     #[inline]
     pub fn is_elapsed(&self) -> bool {
-        self.timer.notified.get() == true
+        self.timer.notified.get()
     }
 
     pub fn reset_at(&mut self, deadline: Instant) {
@@ -32,13 +32,17 @@ impl Sleep {
     }
 
     pub fn reset(&mut self, duration: Duration) {
-        self.reset_at(Instant::now() + duration);
+        LocalContext::with(|ctx| unsafe {
+            ctx.timers(|timers| timers.reset_at(&self.timer, timers.clock.current() + duration))
+        })
     }
 }
 
 #[inline]
 pub fn sleep(duration: Duration) -> Sleep {
-    Sleep::at(Instant::now() + duration)
+    LocalContext::with(|ctx| unsafe {
+        ctx.timers(|timers| timers.sleep_at(timers.clock.current() + duration))
+    })
 }
 
 impl Future for Sleep {
