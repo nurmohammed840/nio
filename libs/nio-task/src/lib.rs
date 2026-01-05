@@ -144,6 +144,7 @@ impl<M> Task<M> {
         }
     }
 
+    /// # Safety
     pub unsafe fn new_unchecked<F, S>(
         meta: M,
         future: F,

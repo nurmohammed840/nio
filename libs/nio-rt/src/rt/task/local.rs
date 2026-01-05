@@ -72,17 +72,12 @@ const DROP_STRATEGY: u8 = PANIC;
 
 impl<F> Drop for LocalFuture<F> {
     fn drop(&mut self) {
-        if DROP_STRATEGY == ABORT {
-            if !is_same_worker(|id| self.worker_id == id) {
-                eprintln!("local task dropped by a thread that didn't spawn it");
-                std::process::abort();
-            }
+        if DROP_STRATEGY == ABORT && !is_same_worker(|id| self.worker_id == id) {
+            eprint!("local task dropped by a thread that didn't spawn it");
+            std::process::abort();
         }
-        if DROP_STRATEGY == PANIC {
-            assert!(
-                is_same_worker(|id| self.worker_id == id),
-                "local task dropped by a thread that didn't spawn it"
-            );
+        if DROP_STRATEGY == PANIC && !is_same_worker(|id| self.worker_id == id) {
+            panic!("local task dropped by a thread that didn't spawn it")
         }
         unsafe {
             ManuallyDrop::drop(&mut self.fut);

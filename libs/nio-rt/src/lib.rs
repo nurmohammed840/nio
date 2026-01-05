@@ -2,9 +2,9 @@
 
 pub mod fs;
 
+mod driver;
 mod local_waker;
 mod rt;
-mod driver;
 mod timer;
 mod utils;
 
