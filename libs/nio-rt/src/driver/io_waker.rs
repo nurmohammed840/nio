@@ -2,7 +2,7 @@ use std::{cell::Cell, rc::Rc};
 
 use crate::local_waker::LocalWaker;
 
-struct Readiness(u8);
+pub struct Readiness(u8);
 
 impl Readiness {
     const READABLE: u8 = 0b_01;
@@ -14,32 +14,33 @@ impl Readiness {
     const WRITE_MASK: u8 = Readiness::WRITABLE | Readiness::WRITE_CLOSED;
 
     #[inline]
-    fn is_readable(&self) -> bool {
+    pub fn is_readable(&self) -> bool {
         self.0 & Readiness::READ_MASK != 0
     }
 
     #[inline]
-    fn is_writable(&self) -> bool {
+    pub fn is_writable(&self) -> bool {
         self.0 & Readiness::WRITE_MASK != 0
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct IoWaker {
-    pub readiness: Cell<u8>,
-    pub read_waker: LocalWaker,
-    pub write_waker: LocalWaker,
+    readiness: Cell<u8>,
+    pub reader: LocalWaker,
+    pub writer: LocalWaker,
 }
 
 impl IoWaker {
     #[inline]
-    pub fn new() -> Rc<IoWaker> {
-        Rc::new(Self::default())
+    pub fn new() -> Box<IoWaker> {
+        Box::new(Self::default())
     }
 
     #[inline]
-    pub fn addr(self: &Rc<Self>) -> usize {
-        Rc::as_ptr(self).expose_provenance()
+    pub fn addr(self: &Box<Self>) -> usize {
+        let ptr = &raw const **self;
+        ptr.expose_provenance()
     }
 
     #[inline]
@@ -48,17 +49,17 @@ impl IoWaker {
     }
 
     #[inline]
-    fn readiness(&self) -> Readiness {
+    pub fn readiness(&self) -> Readiness {
         Readiness(self.readiness.get())
     }
 
     #[inline]
-    fn clear_read(&self, readiness: Readiness) {
+    pub fn clear_read(&self, readiness: Readiness) {
         self.readiness.set(readiness.0 & !Readiness::READABLE);
     }
 
     #[inline]
-    fn clear_write(&self, readiness: Readiness) {
+    pub fn clear_write(&self, readiness: Readiness) {
         self.readiness.set(readiness.0 & !Readiness::WRITABLE);
     }
 
@@ -92,10 +93,10 @@ impl IoWaker {
         self.readiness.set(readiness);
 
         if readiness & Readiness::READ_MASK != 0 {
-            self.read_waker.wake();
+            self.reader.wake();
         }
         if readiness & Readiness::WRITE_MASK != 0 {
-            self.write_waker.wake();
+            self.writer.wake();
         }
 
         #[cfg(debug_assertions)]
@@ -108,15 +109,15 @@ impl IoWaker {
         }
     }
 
-    fn drop_waker(&self) {
-        self.read_waker.take();
-        self.write_waker.take();
+    pub fn drop_waker(&self) {
+        self.reader.take();
+        self.writer.take();
     }
 }
 
 impl Drop for IoWaker {
     fn drop(&mut self) {
-        self.read_waker.wake();
-        self.write_waker.wake();
+        self.reader.wake();
+        self.writer.wake();
     }
 }

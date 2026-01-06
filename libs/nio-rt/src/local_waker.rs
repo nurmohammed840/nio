@@ -42,6 +42,7 @@ impl LocalWaker {
 
 impl fmt::Debug for LocalWaker {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "LocalWaker")
+        let has_waker = unsafe { (*self.waker.get()).is_some() };
+        write!(f, "LocalWaker: {has_waker}")
     }
 }
