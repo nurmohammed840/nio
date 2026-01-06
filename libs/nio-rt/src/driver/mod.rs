@@ -2,6 +2,7 @@ mod io_waker;
 mod async_io;
 use std::{io::Result, time::Duration};
 
+pub use io_waker::IoWaker;
 pub use mio::{Events, Registry, Waker, event::Event};
 
 pub struct Driver {

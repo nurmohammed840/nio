@@ -4,7 +4,10 @@ use super::*;
 use std::{
     io,
     rc::Rc,
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
     time::{Duration, Instant},
 };
 
@@ -26,8 +29,35 @@ impl WorkerId {
     }
 }
 
+pub struct Notifier {
+    waker: driver::Waker,
+    state: AtomicUsize,
+}
+
+impl Notifier {
+    const RESET: usize = 0;
+    const NOTIFIED: usize = 1;
+
+    fn new(waker: driver::Waker) -> Self {
+        Self {
+            waker,
+            state: AtomicUsize::new(Notifier::RESET),
+        }
+    }
+
+    pub fn notify_once(&self) {
+        if self.state.swap(Notifier::NOTIFIED, Ordering::Acquire) == Notifier::RESET {
+            self.waker.wake();
+        }
+    }
+
+    pub fn accept_notify_once(&self) {
+        self.state.store(Notifier::RESET, Ordering::Release);
+    }
+}
+
 pub struct Workers {
-    wakers: Box<[driver::Waker]>,
+    notifiers: Box<[Notifier]>,
     task_counters: Box<[TaskCounter]>,
     shared_queues: Box<[SharedQueue]>,
 }
@@ -54,9 +84,8 @@ impl Workers {
         }
     }
 
-    #[inline]
-    pub fn wake(&self, id: WorkerId) {
-        unsafe { self.wakers.get_unchecked(id.get()) }.wake();
+    pub fn notifier(&self, id: WorkerId) -> &Notifier {
+        unsafe { self.notifiers.get_unchecked(id.get()) }
     }
 
     #[inline]
@@ -73,17 +102,17 @@ impl Workers {
 impl Workers {
     pub fn new(count: u8) -> io::Result<(Self, Box<[Driver]>)> {
         let mut drivers = Vec::with_capacity(count as usize);
-        let mut wakers = Vec::with_capacity(count as usize);
+        let mut notifier = Vec::with_capacity(count as usize);
 
         for _ in (0..count) {
             let (driver, waker) = Driver::with_capacity(1024)?;
             drivers.push(driver);
-            wakers.push(waker);
+            notifier.push(Notifier::new(waker));
         }
 
         Ok((
             Self {
-                wakers: wakers.into_boxed_slice(),
+                notifiers: notifier.into_boxed_slice(),
                 task_counters: (0..count).map(|_| TaskCounter::new()).collect(),
                 shared_queues: (0..count).map(|_| SegQueue::new()).collect(),
             },
@@ -95,11 +124,12 @@ impl Workers {
         debug_assert_ne!(tick, 0);
         context.clone().init();
 
+        let notifier = context.notifier();
         let task_counter = context.task_counter();
 
         loop {
             let mut tick = Tick(tick);
-            'event_interval: while tick.has_steps_left() {
+            'event_interval: while !tick.is_empty() {
                 match unsafe { context.local_queue(|q| q.pop_front()) } {
                     Some(task) => match task.poll() {
                         Status::Yielded(task) => {
@@ -112,6 +142,8 @@ impl Workers {
                         }
                     },
                     None => {
+                        notifier.accept_notify_once();
+
                         let counter = task_counter.load();
                         if counter.shared_queue_has_data() {
                             context.move_tasks_from_shared_to_local_queue(counter);
@@ -125,20 +157,22 @@ impl Workers {
             let (timers, timeout) = unsafe {
                 context.timers(|timer| {
                     let now = timer.clock.now();
-                    let done = timer.fetch(now);
-                    let timeout = if done.is_some() {
+                    let elapsed = timer.fetch(now);
+
+                    let timeout = if elapsed.is_some() || tick.is_empty() {
                         Some(Duration::ZERO)
                     } else {
                         timer.next_timeout(now)
                     };
-                    (done, timeout)
+                    (elapsed, timeout)
                 })
             };
 
             if let Some(timers) = timers {
                 timers.notify_all();
             }
-
+            
+            // `driver.poll` method clear wake up notifications.
             let events = match driver.poll(timeout) {
                 Ok(events) => events,
                 Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
@@ -151,10 +185,12 @@ impl Workers {
                 Err(e) => panic!("unexpected error when polling the I/O driver: {e:?}"),
             };
 
-            for ev in events {
-                if Driver::has_woken(ev) {
+            for event in events {
+                if Driver::has_woken(event) {
                     continue;
                 }
+                let ptr = driver::IoWaker::from(event.token().0);
+                unsafe { (*ptr).notify(event) };
             }
         }
     }
@@ -163,8 +199,8 @@ impl Workers {
 struct Tick(u32);
 
 impl Tick {
-    fn has_steps_left(&self) -> bool {
-        self.0 > 0
+    fn is_empty(&self) -> bool {
+        self.0 == 0
     }
     fn step(&mut self) {
         self.0 -= 1;

@@ -1,5 +1,5 @@
 use crate::driver::io_waker::Readiness;
-use crate::{driver::io_waker::IoWaker, rt::context::LocalContext};
+use crate::{driver::IoWaker, rt::context::LocalContext};
 use mio::Interest;
 use mio::event::Source;
 use std::future::{PollFn, poll_fn};
