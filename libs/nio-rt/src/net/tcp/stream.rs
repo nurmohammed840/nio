@@ -4,6 +4,7 @@ use std::fmt;
 use std::future::poll_fn;
 use std::io::{Error, IoSlice, Result};
 use std::net::{Shutdown, SocketAddr, ToSocketAddrs};
+use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use super::split::{TcpReader, TcpWriter, split};
@@ -76,21 +77,6 @@ impl TcpStream {
     pub fn split(self) -> (TcpReader, TcpWriter) {
         split(self)
     }
-
-    // pub fn read<'b>(&mut self, buf: &'b mut [u8]) -> impl Future<Output = Result<usize>> + use<'_, 'b> {
-    //     poll_fn(|cx| self.0.poll_read(cx, buf))
-    // }
-
-    // pub fn write<'b>(&mut self, buf: &'b [u8]) -> impl Future<Output = Result<usize>> + use<'_, 'b> {
-    //     poll_fn(|cx| self.0.poll_write(cx, buf))
-    // }
-
-    // pub fn write_vectored<'b>(
-    //     &mut self,
-    //     bufs: &'b [IoSlice],
-    // ) -> impl Future<Output = Result<usize>> + use<'_, 'b> {
-    //     poll_fn(|cx| self.0.poll_write_vectored(cx, bufs))
-    // }
 
     #[inline]
     pub fn poll_read(&self, cx: &mut Context, buf: &mut [u8]) -> Poll<Result<usize>> {
