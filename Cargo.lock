@@ -1067,7 +1067,7 @@ name = "nio-rt"
 version = "0.1.0"
 dependencies = [
  "crossbeam-queue",
- "futures",
+ "futures-io",
  "mio",
  "nio-future",
  "nio-macro",

@@ -19,7 +19,7 @@ use std::{
 macro_rules! impl_async_read {
     [$($name:ty),*] => [$(
         #[cfg(feature = "futures-io")]
-        impl futures::AsyncRead for $name {
+        impl futures_io::AsyncRead for $name {
             #[inline]
             fn poll_read(
                 self: Pin<&mut Self>,
@@ -53,7 +53,7 @@ macro_rules! impl_async_read {
 macro_rules! impl_async_write {
     [$($name:ty),*] => [$(
         #[cfg(feature = "futures-io")]
-        impl futures::AsyncWrite for $name {
+        impl futures_io::AsyncWrite for $name {
             #[inline]
             fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize>> {
                 Self::poll_write(&self, cx, buf)
