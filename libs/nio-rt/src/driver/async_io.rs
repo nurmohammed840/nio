@@ -11,17 +11,17 @@ use std::{
 };
 
 #[derive(Debug)]
-struct AsyncIO<Io: Source> {
+pub struct AsyncIO<Io: Source> {
     pub(crate) io: Io,
     waker: Box<IoWaker>,
 }
 
 impl<Io: Source> AsyncIO<Io> {
-    pub fn new(io: Io) -> Result<Self> {
+    pub fn new(io: Io) -> Self {
         Self::with_interest(io, Interest::READABLE | Interest::WRITABLE)
     }
 
-    pub fn with_interest(mut io: Io, interests: Interest) -> Result<Self> {
+    pub fn with_interest(mut io: Io, interests: Interest) -> Self {
         let waker = IoWaker::new();
         let token = mio::Token(waker.addr());
 
@@ -29,7 +29,7 @@ impl<Io: Source> AsyncIO<Io> {
             ctx.io_registry.register(&mut io, token, interests);
         });
 
-        Ok(Self { io, waker })
+        Self { io, waker }
     }
 
     pub fn async_io_read<F, T>(
