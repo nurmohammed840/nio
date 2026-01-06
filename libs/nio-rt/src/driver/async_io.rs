@@ -1,12 +1,8 @@
-use crate::{
-    driver::{IoWaker, io_waker::Readiness},
-    rt::context::LocalContext,
-};
+use crate::{driver::IoWaker, rt::context::LocalContext};
 use mio::{Interest, event::Source};
 use std::{
     future::{PollFn, poll_fn},
     io::{ErrorKind, IoSlice, Read, Result, Write},
-    rc::Rc,
     task::{Context, Poll},
 };
 
@@ -17,19 +13,17 @@ pub struct AsyncIO<Io: Source> {
 }
 
 impl<Io: Source> AsyncIO<Io> {
-    pub fn new(io: Io) -> Self {
+    pub fn new(io: Io) -> Result<Self> {
         Self::with_interest(io, Interest::READABLE | Interest::WRITABLE)
     }
 
-    pub fn with_interest(mut io: Io, interests: Interest) -> Self {
+    pub fn with_interest(mut io: Io, interests: Interest) -> Result<Self> {
         let waker = IoWaker::new();
         let token = mio::Token(waker.addr());
 
-        LocalContext::with(|ctx| {
-            ctx.io_registry.register(&mut io, token, interests);
-        });
+        LocalContext::with(|ctx| ctx.io_registry.register(&mut io, token, interests))?;
 
-        Self { io, waker }
+        Ok(Self { io, waker })
     }
 
     pub fn async_io_read<F, T>(
@@ -78,7 +72,7 @@ impl<Io: Source> AsyncIO<Io> {
         })
     }
 
-    pub fn poll_read_readiness(
+    pub fn _poll_read_readiness(
         &self,
     ) -> PollFn<impl FnMut(&mut Context) -> Poll<()> + use<'_, Io>> {
         poll_fn(move |cx| {
@@ -191,7 +185,7 @@ impl<Io: Source> AsyncIO<Io> {
 impl<Io: Source> Drop for AsyncIO<Io> {
     fn drop(&mut self) {
         LocalContext::with(|ctx| {
-            ctx.io_registry.deregister(&mut self.io);
+            let _ = ctx.io_registry.deregister(&mut self.io);
         });
         self.waker.drop_waker();
     }

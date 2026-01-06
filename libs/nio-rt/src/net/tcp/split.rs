@@ -1,5 +1,4 @@
 use crate::net::TcpStream;
-use std::future::poll_fn;
 use std::io::{Error, IoSlice};
 use std::net::SocketAddr;
 use std::rc::Rc;
@@ -18,7 +17,7 @@ pub(crate) fn split(stream: TcpStream) -> (TcpReader, TcpWriter) {
     (TcpReader(stream.clone()), TcpWriter(stream))
 }
 
-pub(crate) fn reunite(
+pub(crate) fn _reunite(
     read: TcpReader,
     write: TcpWriter,
 ) -> Result<TcpStream, (TcpReader, TcpWriter)> {

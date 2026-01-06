@@ -1,10 +1,8 @@
 use crate::driver::AsyncIO;
 use crate::net::utils::bind;
 use std::fmt;
-use std::future::poll_fn;
 use std::io::{Error, IoSlice, Result};
 use std::net::{Shutdown, SocketAddr, ToSocketAddrs};
-use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use super::split::{TcpReader, TcpWriter, split};
@@ -12,8 +10,8 @@ use super::split::{TcpReader, TcpWriter, split};
 pub struct TcpStream(AsyncIO<mio::net::TcpStream>);
 
 impl TcpStream {
-    pub fn new(io: mio::net::TcpStream) -> TcpStream {
-        Self(AsyncIO::new(io))
+    pub fn new(io: mio::net::TcpStream) -> Result<TcpStream> {
+        Ok(Self(AsyncIO::new(io)?))
     }
 
     pub async fn connect<A>(addr: A) -> Result<TcpStream>
@@ -34,7 +32,7 @@ impl TcpStream {
 
     /// Establishes a connection to the specified `addr`.
     fn connect_addr(addr: SocketAddr) -> Result<TcpStream> {
-        Ok(TcpStream::new(mio::net::TcpStream::connect(addr)?))
+        TcpStream::new(mio::net::TcpStream::connect(addr)?)
     }
 
     pub fn local_addr(&self) -> Result<SocketAddr> {

@@ -4,7 +4,7 @@ mod runtime;
 use std::{cell::UnsafeCell, rc::Rc};
 
 use super::*;
-use worker::{SharedQueue, WorkerId};
+use worker::WorkerId;
 
 pub use local::LocalContext;
 pub use runtime::RuntimeContext;

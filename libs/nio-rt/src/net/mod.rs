@@ -69,12 +69,12 @@ macro_rules! impl_async_write {
             }
 
             #[inline]
-            fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>> {
+            fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<()>> {
                 Poll::Ready(Ok(()))
             }
 
             #[inline]
-            fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>> {
+            fn poll_close(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<()>> {
                 self.shutdown(std::net::Shutdown::Write)?;
                 Poll::Ready(Ok(()))
             }

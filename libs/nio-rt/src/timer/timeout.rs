@@ -51,7 +51,7 @@ where
 impl<T: Future> Future for Timeout<T> {
     type Output = Option<T::Output>;
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = unsafe { self.get_unchecked_mut() };
         match unsafe { Pin::new_unchecked(&mut this.fut).poll(cx) } {
             Poll::Ready(val) => Poll::Ready(Some(val)),

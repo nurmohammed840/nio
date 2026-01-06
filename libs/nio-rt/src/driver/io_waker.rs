@@ -1,4 +1,4 @@
-use std::{cell::Cell, rc::Rc};
+use std::cell::Cell;
 
 use crate::local_waker::LocalWaker;
 

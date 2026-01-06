@@ -29,16 +29,16 @@ impl Driver {
     pub fn has_woken(ev: &Event) -> bool {
         ev.token() == WAKE_TOKEN
     }
-
+    
     pub fn registry(&self) -> &Registry {
         self.poll.registry()
     }
 
     pub fn registry_owned(&self) -> Result<Registry> {
-        self.poll.registry().try_clone()
+        self.registry().try_clone()
     }
 
-    pub fn is_empty(&self) -> bool {
+    pub fn _is_empty(&self) -> bool {
         self.events.is_empty()
     }
 

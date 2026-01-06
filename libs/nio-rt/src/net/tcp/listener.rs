@@ -11,12 +11,12 @@ use std::{
 pub struct TcpListener(AsyncIO<mio::net::TcpListener>);
 
 impl TcpListener {
-    pub fn new(io: mio::net::TcpListener) -> TcpListener {
-        TcpListener(AsyncIO::new(io))
+    pub fn new(io: mio::net::TcpListener) -> Result<TcpListener> {
+        Ok(TcpListener(AsyncIO::new(io)?))
     }
 
     fn bind_addr(addr: SocketAddr) -> Result<TcpListener> {
-        Ok(TcpListener::new(mio::net::TcpListener::bind(addr)?))
+        TcpListener::new(mio::net::TcpListener::bind(addr)?)
     }
 
     pub async fn bind<A: ToSocketAddrs>(addr: A) -> Result<TcpListener> {
@@ -80,9 +80,9 @@ impl TcpConnection {
     pub fn local_addr(&self) -> Result<SocketAddr> {
         self.stream.local_addr()
     }
-    
+
     pub async fn connect(self) -> Result<TcpStream> {
-        Ok(TcpStream::new(self.stream))
+        TcpStream::new(self.stream)
     }
 }
 

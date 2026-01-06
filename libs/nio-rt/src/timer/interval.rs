@@ -10,25 +10,25 @@ use std::{
 };
 
 #[derive(Debug)]
-struct Interval {
+pub struct Interval {
     delay: Sleep,
     period: Duration,
 }
 
 impl Interval {
     #[inline]
-    fn at(deadline: Instant, period: Duration) -> Interval {
+    pub fn at(deadline: Instant, period: Duration) -> Interval {
         Interval {
             delay: Sleep::at(deadline),
             period,
         }
     }
 
-    fn period(&self) -> Duration {
+    pub fn period(&self) -> Duration {
         self.period
     }
 
-    fn set_period(&mut self, period: Duration) {
+    pub fn set_period(&mut self, period: Duration) {
         self.period = period;
     }
 
@@ -55,7 +55,7 @@ impl Interval {
     }
 }
 
-fn interval(period: Duration) -> Interval {
+pub fn interval(period: Duration) -> Interval {
     Interval {
         delay: sleep(Duration::ZERO),
         period,
@@ -80,7 +80,7 @@ impl DerefMut for Interval {
 
 #[cfg(test)]
 mod tests {
-
+    #[allow(warnings)]
     use crate::timer::sleep::sleep;
 
     use super::*;

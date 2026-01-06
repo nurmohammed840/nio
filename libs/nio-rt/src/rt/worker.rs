@@ -4,11 +4,8 @@ use super::*;
 use std::{
     io,
     rc::Rc,
-    sync::{
-        Arc,
-        atomic::{AtomicUsize, Ordering},
-    },
-    time::{Duration, Instant},
+    sync::atomic::{AtomicUsize, Ordering},
+    time::Duration,
 };
 
 use crossbeam_queue::SegQueue;
@@ -47,7 +44,7 @@ impl Notifier {
 
     pub fn notify_once(&self) {
         if self.state.swap(Notifier::NOTIFIED, Ordering::Acquire) == Notifier::RESET {
-            self.waker.wake();
+            let _ = self.waker.wake();
         }
     }
 
@@ -104,7 +101,7 @@ impl Workers {
         let mut drivers = Vec::with_capacity(count as usize);
         let mut notifier = Vec::with_capacity(count as usize);
 
-        for _ in (0..count) {
+        for _ in 0..count {
             let (driver, waker) = Driver::with_capacity(1024)?;
             drivers.push(driver);
             notifier.push(Notifier::new(waker));
@@ -171,7 +168,7 @@ impl Workers {
             if let Some(timers) = timers {
                 timers.notify_all();
             }
-            
+
             // `driver.poll` method clear wake up notifications.
             let events = match driver.poll(timeout) {
                 Ok(events) => events,

@@ -1,22 +1,22 @@
-#![allow(unused)]
-
 pub mod fs;
+pub mod net;
 
 mod driver;
-mod net;
 mod local_waker;
 mod rt;
 mod timer;
 mod utils;
 
-pub use nio_macro::*;
-use std::num::NonZeroUsize;
-use std::time::Duration;
-
-pub use rt::Runtime;
 use rt::context::LocalContext;
-pub use rt::context::RuntimeContext;
-pub use rt::task::JoinHandle;
+use std::{num::NonZeroUsize, time::Duration};
+
+pub use nio_macro::*;
+pub use rt::{Runtime, context::RuntimeContext, task::JoinHandle};
+pub use timer::{
+    interval::{Interval, interval},
+    sleep::{Sleep, sleep},
+    timeout::{Timeout, timeout},
+};
 
 pub struct RuntimeBuilder {
     worker_threads: u8,

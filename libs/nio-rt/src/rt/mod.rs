@@ -3,7 +3,7 @@ pub mod task;
 mod task_counter;
 mod worker;
 
-use crate::{RuntimeBuilder, driver, rt::worker::WorkerId};
+use crate::{RuntimeBuilder, driver};
 use std::{io, sync::Arc, thread};
 
 use nio_threadpool::ThreadPool;

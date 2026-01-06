@@ -1,19 +1,19 @@
 use crate::driver::AsyncIO;
 use crate::net::utils::bind;
-use std::io::{Error, Result};
-use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs};
+use std::io::Result;
+use std::net::{SocketAddr, ToSocketAddrs};
 use std::ops::Deref;
 use std::{fmt, future};
 
 pub struct UdpSocket(AsyncIO<mio::net::UdpSocket>);
 
 impl UdpSocket {
-    fn new(socket: mio::net::UdpSocket) -> UdpSocket {
-        UdpSocket(AsyncIO::new(socket))
+    fn new(socket: mio::net::UdpSocket) -> Result<UdpSocket> {
+        Ok(UdpSocket(AsyncIO::new(socket)?))
     }
 
     fn bind_addr(addr: SocketAddr) -> Result<UdpSocket> {
-        Ok(UdpSocket::new(mio::net::UdpSocket::bind(addr)?))
+        UdpSocket::new(mio::net::UdpSocket::bind(addr)?)
     }
 
     pub async fn bind<A>(addr: A) -> Result<Self>

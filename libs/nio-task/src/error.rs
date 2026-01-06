@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use std::any::Any;
 use std::fmt;
 use std::io;
@@ -24,13 +23,6 @@ impl JoinError {
     pub(super) fn panic(err: Box<dyn Any + Send + 'static>) -> JoinError {
         JoinError {
             repr: Repr::Panic(err),
-        }
-    }
-
-    pub(super) fn from(panic_result: Result<(), Box<dyn Any + Send>>) -> JoinError {
-        match panic_result {
-            Ok(()) => JoinError::cancelled(),
-            Err(err) => JoinError::panic(err),
         }
     }
 
