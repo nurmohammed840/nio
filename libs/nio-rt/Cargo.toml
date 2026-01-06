@@ -11,3 +11,8 @@ nio-threadpool = { path = "../nio-threadpool", version = "*" }
 nio-macro = { path = "../nio-macros", version = "*" }
 
 crossbeam-queue = "0.3"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [
+  "cfg(mio_unsupported_force_poll_poll)",
+] }

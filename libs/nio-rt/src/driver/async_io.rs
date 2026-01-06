@@ -1,15 +1,18 @@
-use crate::driver::io_waker::Readiness;
-use crate::{driver::IoWaker, rt::context::LocalContext};
-use mio::Interest;
-use mio::event::Source;
-use std::future::{PollFn, poll_fn};
-use std::io::{ErrorKind, Result};
-use std::rc::Rc;
-use std::task::{Context, Poll};
+use crate::{
+    driver::{IoWaker, io_waker::Readiness},
+    rt::context::LocalContext,
+};
+use mio::{Interest, event::Source};
+use std::{
+    future::{PollFn, poll_fn},
+    io::{ErrorKind, IoSlice, Read, Result, Write},
+    rc::Rc,
+    task::{Context, Poll},
+};
 
 #[derive(Debug)]
 struct AsyncIO<Io: Source> {
-    io: Io,
+    pub(crate) io: Io,
     waker: Box<IoWaker>,
 }
 
@@ -38,11 +41,11 @@ impl<Io: Source> AsyncIO<Io> {
     {
         poll_fn(move |cx| {
             self.waker.reader.register(cx);
-            
+
             let readiness = self.waker.readiness();
             if readiness.is_readable() {
                 match f(&self.io) {
-                    Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
+                    Err(err) if err.kind() == ErrorKind::WouldBlock => {
                         self.waker.clear_read(readiness)
                     }
                     res => return Poll::Ready(res),
@@ -65,7 +68,7 @@ impl<Io: Source> AsyncIO<Io> {
             let readiness = self.waker.readiness();
             if readiness.is_writable() {
                 match f(&self.io) {
-                    Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
+                    Err(err) if err.kind() == ErrorKind::WouldBlock => {
                         self.waker.clear_write(readiness)
                     }
                     res => return Poll::Ready(res),
@@ -97,6 +100,91 @@ impl<Io: Source> AsyncIO<Io> {
             }
             Poll::Pending
         })
+    }
+}
+
+impl<Io: Source> AsyncIO<Io> {
+    pub fn poll_read<'a>(&'a self, cx: &mut Context, buf: &mut [u8]) -> Poll<Result<usize>>
+    where
+        &'a Io: Read,
+    {
+        self.waker.reader.register(cx);
+
+        let readiness = self.waker.readiness();
+        if readiness.is_readable() {
+            match Read::read(&mut &self.io, buf) {
+                Ok(nbytes) => {
+                    // When mio is using the epoll or kqueue selector, reading a partially full
+                    // buffer is sufficient to show that the socket buffer has been drained.
+                    //
+                    // This optimization does not work for level-triggered selectors such as
+                    // windows or when poll is used.
+                    //
+                    // Read more:
+                    // https://github.com/tokio-rs/tokio/issues/5866
+                    #[cfg(all(not(mio_unsupported_force_poll_poll), not(windows)))]
+                    if 0 < nbytes && nbytes < buf.len() {
+                        // same as: nbytes in 1..buf.len()
+                        self.waker.clear_read(readiness);
+                    }
+                    return Poll::Ready(Ok(nbytes));
+                }
+                Err(err) if err.kind() == ErrorKind::WouldBlock => self.waker.clear_read(readiness),
+                Err(err) => return Poll::Ready(Err(err)),
+            }
+        }
+        Poll::Pending
+    }
+
+    pub fn poll_write<'a>(&'a self, cx: &mut Context, buf: &[u8]) -> Poll<Result<usize>>
+    where
+        &'a Io: Write,
+    {
+        self.waker.writer.register(cx);
+
+        let readiness = self.waker.readiness();
+        if readiness.is_writable() {
+            match Write::write(&mut &self.io, buf) {
+                Ok(nbytes) => {
+                    // if we write only part of our buffer, this is sufficient on unix to show
+                    // that the socket buffer is full.  Unfortunately this assumption
+                    // fails for level-triggered selectors (like on Windows or poll even for
+                    // UNIX): https://github.com/tokio-rs/tokio/issues/5866
+                    #[cfg(all(not(mio_unsupported_force_poll_poll), not(windows)))]
+                    if 0 < nbytes && nbytes < buf.len() {
+                        self.waker.clear_write(readiness);
+                    }
+                    return Poll::Ready(Ok(nbytes));
+                }
+                Err(err) if err.kind() == ErrorKind::WouldBlock => {
+                    self.waker.clear_write(readiness)
+                }
+                Err(err) => return Poll::Ready(Err(err)),
+            }
+        }
+        Poll::Pending
+    }
+
+    pub fn poll_write_vectored<'a>(
+        &'a self,
+        cx: &mut Context,
+        bufs: &[IoSlice],
+    ) -> Poll<Result<usize>>
+    where
+        &'a Io: Write,
+    {
+        self.waker.writer.register(cx);
+
+        let readiness = self.waker.readiness();
+        if readiness.is_writable() {
+            match Write::write_vectored(&mut &self.io, bufs) {
+                Err(err) if err.kind() == ErrorKind::WouldBlock => {
+                    self.waker.clear_write(readiness)
+                }
+                res => return Poll::Ready(res),
+            }
+        }
+        Poll::Pending
     }
 }
 
