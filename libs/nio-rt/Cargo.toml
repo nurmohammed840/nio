@@ -24,3 +24,11 @@ futures-io = ["dep:futures-io"]
 unexpected_cfgs = { level = "warn", check-cfg = [
   "cfg(mio_unsupported_force_poll_poll)",
 ] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
+futures-lite = { version = "2", default-features = false }
+
+[[test]]
+name = "async_io_test_suite"    # The name of the test binary
+path = "tests/async-io/mod.rs"
