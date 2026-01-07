@@ -3,7 +3,7 @@ use crate::{
     net::{TcpStream, utils::bind},
 };
 use std::{
-    fmt,
+    fmt, future,
     io::{Error, Result},
     net::{SocketAddr, ToSocketAddrs},
 };
@@ -19,8 +19,8 @@ impl TcpListener {
         TcpListener::new(mio::net::TcpListener::bind(addr)?)
     }
 
-    pub async fn bind<A: ToSocketAddrs>(addr: A) -> Result<TcpListener> {
-        bind(addr, TcpListener::bind_addr)
+    pub fn bind<A: ToSocketAddrs>(addr: A) -> impl Future<Output = Result<TcpListener>> {
+        future::ready(bind(addr, TcpListener::bind_addr))
     }
 
     pub fn accept(&self) -> impl Future<Output = Result<TcpConnection>> + '_ {
@@ -81,8 +81,8 @@ impl TcpConnection {
         self.stream.local_addr()
     }
 
-    pub async fn connect(self) -> Result<TcpStream> {
-        TcpStream::new(self.stream)
+    pub fn connect(self) -> impl Future<Output = Result<TcpStream>> {
+        future::ready(TcpStream::new(self.stream))
     }
 }
 

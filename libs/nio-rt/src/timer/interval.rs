@@ -32,8 +32,8 @@ impl Interval {
         self.period = period;
     }
 
-    pub async fn tick(&mut self) {
-        poll_fn(|cx| self.poll(cx)).await
+    pub fn tick<'a>(&'a mut self) -> impl Future + use<'a> {
+        poll_fn(|cx| self.poll(cx))
     }
 
     pub fn poll(&mut self, cx: &mut Context<'_>) -> Poll<()> {

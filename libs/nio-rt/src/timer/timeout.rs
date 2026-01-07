@@ -7,10 +7,12 @@ use std::{
     time::{Duration, Instant},
 };
 
-pub struct Timeout<T> {
+pub struct Timeout<Fut> {
     delay: Sleep,
-    fut: T,
+    fut: Fut,
 }
+
+impl<F> Unpin for Timeout<F> {}
 
 impl<T> Timeout<T> {
     pub fn at<F>(deadline: Instant, future: F) -> Timeout<F::IntoFuture>
@@ -48,8 +50,8 @@ where
     }
 }
 
-impl<T: Future> Future for Timeout<T> {
-    type Output = Option<T::Output>;
+impl<Fut: Future> Future for Timeout<Fut> {
+    type Output = Option<Fut::Output>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = unsafe { self.get_unchecked_mut() };

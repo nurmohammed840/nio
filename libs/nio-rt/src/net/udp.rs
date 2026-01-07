@@ -16,11 +16,11 @@ impl UdpSocket {
         UdpSocket::new(mio::net::UdpSocket::bind(addr)?)
     }
 
-    pub async fn bind<A>(addr: A) -> Result<Self>
+    pub fn bind<A>(addr: A) -> impl Future<Output = Result<Self>>
     where
         A: ToSocketAddrs,
     {
-        bind(addr, UdpSocket::bind_addr)
+        future::ready(bind(addr, UdpSocket::bind_addr))
     }
 
     pub fn connect<A>(&self, addr: A) -> impl Future<Output = Result<()>> + use<'_, A>
