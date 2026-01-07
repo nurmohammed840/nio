@@ -12,8 +12,8 @@ nio-macro = { path = "../nio-macros", version = "*" }
 
 crossbeam-queue = "0.3"
 
+futures-io = { version = "0.3", optional = true }
 tokio = { version = "1", default-features = false, optional = true }
-futures-io = { version = "0.3", default-features = false, optional = true }
 
 [features]
 default = ["futures-io"]
