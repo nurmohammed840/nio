@@ -3,6 +3,7 @@ use mio::{Interest, event::Source};
 use std::{
     future::{PollFn, poll_fn},
     io::{ErrorKind, IoSlice, Read, Result, Write},
+    pin::Pin,
     task::{Context, Poll},
 };
 
@@ -26,12 +27,12 @@ impl<Io: Source> AsyncIO<Io> {
         Ok(Self { io, waker })
     }
 
-    pub fn async_io_read<F, T>(
-        &self,
+    pub fn async_io_read<'a, F, T>(
+        &'a self,
         mut f: F,
-    ) -> PollFn<impl FnMut(&mut Context) -> Poll<Result<T>> + use<'_, F, Io, T>>
+    ) -> PollFn<impl FnMut(&mut Context) -> Poll<Result<T>> + use<'a, F, Io, T>>
     where
-        F: FnMut(&Io) -> Result<T>,
+        F: FnMut(&'a Io) -> Result<T>,
     {
         poll_fn(move |cx| {
             self.waker.reader.register(cx);
@@ -49,12 +50,12 @@ impl<Io: Source> AsyncIO<Io> {
         })
     }
 
-    pub fn async_io_write<F, T>(
-        &self,
+    pub fn async_io_write<'a, F, T>(
+        &'a self,
         mut f: F,
-    ) -> PollFn<impl FnMut(&mut Context) -> Poll<Result<T>> + use<'_, F, Io, T>>
+    ) -> PollFn<impl FnMut(&mut Context) -> Poll<Result<T>> + use<'a, F, Io, T>>
     where
-        F: FnMut(&Io) -> Result<T>,
+        F: FnMut(&'a Io) -> Result<T>,
     {
         poll_fn(move |cx| {
             self.waker.writer.register(cx);
@@ -167,18 +168,8 @@ impl<Io: Source> AsyncIO<Io> {
     where
         &'a Io: Write,
     {
-        self.waker.writer.register(cx);
-
-        let readiness = self.waker.readiness();
-        if readiness.is_writable() {
-            match Write::write_vectored(&mut &self.io, bufs) {
-                Err(err) if err.kind() == ErrorKind::WouldBlock => {
-                    self.waker.clear_write(readiness)
-                }
-                res => return Poll::Ready(res),
-            }
-        }
-        Poll::Pending
+        let mut poll_fn = self.async_io_write(|mut io| Write::write_vectored(&mut io, bufs));
+        Pin::new(&mut poll_fn).poll(cx)
     }
 }
 
