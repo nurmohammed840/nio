@@ -27,7 +27,7 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
-futures-lite = { version = "2", default-features = false }
+futures-lite = { version = "2" }
 
 [[test]]
 name = "async_io_test_suite"    # The name of the test binary
