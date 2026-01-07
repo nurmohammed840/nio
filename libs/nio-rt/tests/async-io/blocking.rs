@@ -40,40 +40,15 @@ async fn chan() -> Result<()> {
 }
 
 #[test]
-async fn panic() -> Result<()> {
+async fn panic() {
     let x = spawn_blocking(|| panic!("expected failure")).await;
-    println!("xssss: {:#?}", x);
+    let panic = x.err().unwrap().into_panic();
 
-    // future::block_on(async {
-    //     let panic = x.catch_unwind().await.unwrap_err();
-
-    //     // Make sure it's our panic and not an unrelated one.
-    //     let msg = if let Some(msg) = panic.downcast_ref::<&'static str>() {
-    //         msg.to_string()
-    //     } else {
-    //         *panic.downcast::<String>().unwrap()
-    //     };
-    //     assert_eq!(msg, "expected failure");
-    // });
-    Ok(())
+    // Make sure it's our panic and not an unrelated one.
+    let msg = if let Some(msg) = panic.downcast_ref::<&'static str>() {
+        msg.to_string()
+    } else {
+        *panic.downcast::<String>().unwrap()
+    };
+    assert_eq!(msg, "expected failure");
 }
-
-// #[test]
-// fn panic_with_mut() {
-//     future::block_on(async {
-//         let mut io = Unblock::new(());
-//         let x = io.with_mut(|()| panic!("expected failure"));
-//         let panic = AssertUnwindSafe(x).catch_unwind().await.unwrap_err();
-
-//         // Make sure it's our panic and not an unrelated one.
-//         let msg = if let Some(msg) = panic.downcast_ref::<&'static str>() {
-//             msg.to_string()
-//         } else {
-//             *panic.downcast::<String>().unwrap()
-//         };
-//         assert_eq!(
-//             msg,
-//             "`Unblock::with_mut()` operation has panicked: RecvError"
-//         );
-//     });
-// }

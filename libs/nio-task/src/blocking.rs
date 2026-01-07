@@ -1,8 +1,8 @@
 use crate::raw::{Fut, Header, PollStatus, RawTask, RawTaskVTable};
 use crate::waker::NOOP_WAKER;
-use crate::{Id, JoinHandle};
+use crate::{Id, JoinError, JoinHandle};
 
-use std::panic::AssertUnwindSafe;
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::task::{Poll, Waker};
 use std::{cell::UnsafeCell, sync::Arc};
 use std::{fmt, panic};
@@ -62,20 +62,27 @@ where
         std::ptr::null_mut()
     }
 
-    /// Panicking is acceptable here, as `BlockingTask` is only execute within the thread pool
     unsafe fn poll(&self, _: &Waker) -> PollStatus {
-        let output = match (*self.func.get()).take() {
-            Fut::Future(func) => func(),
-            _ => unreachable!(),
-        };
-        (*self.func.get()).set_output(Ok(output));
+        let maybe_panicked = catch_unwind(AssertUnwindSafe(|| {
+            let output = match (*self.func.get()).take() {
+                Fut::Future(func) => func(), // Fn call may panic
+                _ => unreachable!(),
+            };
+            // Droping Fn closure may also panic.
+            (*self.func.get()).set_output(Ok(output));
+        }));
+
+        if let Err(err) = maybe_panicked {
+            (*self.func.get()).set_output(Err(JoinError::panic(err)));
+        }
+
         if !self
             .header
             .transition_to_complete_and_notify_output_if_intrested()
         {
-            unsafe {
-                (*self.func.get()).drop();
-            };
+            // Receiver is not interested in the output, So we can drop it.
+            // Panicking is acceptable here, as `BlockingTask` is only execute within the thread pool
+            unsafe { (*self.func.get()).drop() };
         }
         PollStatus::Complete
     }
