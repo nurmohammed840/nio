@@ -4,17 +4,17 @@
 use nio_rt::net::TcpListener;
 use tokio_test::assert_ok;
 
-use std::io::prelude::*;
+use std::io::{Result, prelude::*};
 use std::net::TcpStream;
 use std::thread;
 
 #[nio_rt::test]
 #[cfg_attr(miri, ignore)] // No `socket` on miri.
-async fn echo_server() {
+async fn echo_server() -> Result<()> {
     const N: usize = 1024;
 
-    let srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
-    let addr = assert_ok!(srv.local_addr());
+    let srv = TcpListener::bind("127.0.0.1:0").await?;
+    let addr = srv.local_addr()?;
 
     let msg = "foo bar baz";
 
@@ -38,14 +38,16 @@ async fn echo_server() {
         (expected, t2)
     });
 
-    let mut a = assert_ok!(assert_ok!(srv.accept().await).connect().await);
-    let mut b = assert_ok!(assert_ok!(srv.accept().await).connect().await);
+    let mut a = srv.accept().await?.connect().await?;
+    let mut b = srv.accept().await?.connect().await?;
 
-    let n = assert_ok!(futures_lite::io::copy(&mut a, &mut b).await);
+    let n = futures_lite::io::copy(&mut a, &mut b).await?;
 
     let (expected, t2) = t.join().unwrap();
     let actual = t2.join().unwrap();
 
     assert!(expected == actual);
     assert_eq!(n, msg.len() as u64 * 1024);
+
+    Ok(())
 }

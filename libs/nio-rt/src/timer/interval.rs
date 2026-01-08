@@ -78,21 +78,3 @@ impl DerefMut for Interval {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    #[allow(warnings)]
-    use crate::timer::sleep::sleep;
-
-    use super::*;
-
-    #[crate::test(crate)]
-    async fn test_sname() {
-        let mut interval = interval(Duration::from_secs(1));
-
-        for _ in 0..5 {
-            interval.tick().await;
-            // sleep(Duration::from_secs(1)).await;
-            println!("sad")
-        }
-    }
-}
