@@ -1,14 +1,14 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(not(target_os = "wasi")))] // Wasi does not support bind()
 
-use nio_rt::net::TcpListener;
+use nio_rt::{net::TcpListener, test};
 use tokio_test::assert_ok;
 
 use std::io::{Result, prelude::*};
 use std::net::TcpStream;
 use std::thread;
 
-#[nio_rt::test]
+#[test]
 #[cfg_attr(miri, ignore)] // No `socket` on miri.
 async fn echo_server() -> Result<()> {
     const N: usize = 1024;

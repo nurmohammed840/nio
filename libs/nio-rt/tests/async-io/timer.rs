@@ -5,7 +5,7 @@ use std::{
 };
 
 use futures_lite::FutureExt;
-use nio_rt::{Interval, sleep, spawn_local};
+use nio_rt::{Interval, sleep, spawn_local, test};
 
 struct Timer(pub std::time::Instant);
 
@@ -19,7 +19,7 @@ impl Timer {
     }
 }
 
-#[nio_rt::test]
+#[test]
 async fn smoke() {
     let start = Timer::now();
     sleep(Duration::from_secs(1)).await;
@@ -28,7 +28,8 @@ async fn smoke() {
     assert!(elapsed >= Duration::from_secs(1));
 }
 
-#[nio_rt::test]
+#[test]
+#[cfg_attr(miri, ignore)]
 async fn interval() {
     let period = Duration::from_secs(1);
     let jitter = Duration::from_millis(500);
@@ -48,7 +49,7 @@ async fn interval() {
     assert!(elapsed - period * 2 < jitter);
 }
 
-#[nio_rt::test]
+#[test]
 async fn poll_across_tasks() {
     let start = Timer::now();
     let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
@@ -77,7 +78,8 @@ async fn poll_across_tasks() {
     assert!(start.elapsed() >= Duration::from_secs(1));
 }
 
-#[nio_rt::test]
+#[test]
+// #[cfg_attr(miri, ignore)]
 async fn set() {
     let start = Timer::now();
     let mut timer = sleep(Duration::from_secs(5));

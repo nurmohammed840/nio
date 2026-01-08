@@ -1,3 +1,6 @@
+#![cfg(all(not(target_os = "wasi")))] // Wasi does not support bind()
+#![cfg(not(miri))]
+
 use std::{
     io::{self, Result},
     net::Shutdown,
