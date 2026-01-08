@@ -7,11 +7,14 @@ mod rt;
 mod timer;
 mod utils;
 
-use rt::context::LocalContext;
 use std::{num::NonZeroUsize, time::Duration};
 
 pub use nio_macro::*;
-pub use rt::{Runtime, context::RuntimeContext, task::JoinHandle};
+pub use rt::{
+    Runtime,
+    context::{LocalContext, RuntimeContext},
+    task::JoinHandle,
+};
 pub use timer::{
     interval::{Interval, interval},
     sleep::{Sleep, sleep},

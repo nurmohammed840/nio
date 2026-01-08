@@ -11,17 +11,17 @@ pub struct LocalContext {
     timers: UnsafeCell<Timers>,
     local_queue: UnsafeCell<VecDeque<Task>>,
 
-    pub worker_id: WorkerId,
-    pub runtime_ctx: Arc<RuntimeContext>,
-    pub io_registry: driver::Registry,
+    pub(crate) worker_id: WorkerId,
+    pub(crate) runtime_ctx: Arc<RuntimeContext>,
+    pub(crate) io_registry: driver::Registry,
 }
 
 impl LocalContext {
-    pub fn init(self: Rc<Self>) {
+    pub(crate) fn init(self: Rc<Self>) {
         Context::init(self);
     }
 
-    pub fn with<F, R>(f: F) -> R
+    pub(crate) fn with<F, R>(f: F) -> R
     where
         F: FnOnce(&Rc<LocalContext>) -> R,
     {
@@ -32,7 +32,21 @@ impl LocalContext {
         })
     }
 
-    pub fn new(
+    pub fn current() -> Rc<LocalContext> {
+        LocalContext::with(Rc::clone)
+    }
+
+    pub fn spawn_local<Fut>(&self, future: Fut) -> JoinHandle<Fut::Output>
+    where
+        Fut: Future + 'static,
+        Fut::Output: 'static,
+    {
+        let (task, join) = LocalScheduler::spawn(self.worker_id, self.runtime_ctx.clone(), future);
+        self.add_task_to_local_queue(task);
+        join
+    }
+    
+    pub(crate) fn new(
         worker_id: WorkerId,
         cap: usize,
         runtime_ctx: Arc<RuntimeContext>,
@@ -48,20 +62,10 @@ impl LocalContext {
         .into()
     }
 
-    pub fn add_task_to_local_queue(&self, task: Task) {
+    pub(crate) fn add_task_to_local_queue(&self, task: Task) {
         unsafe { self.local_queue(|q| q.push_back(task)) };
         let counter = self.task_counter().increase_local();
         self.move_tasks_from_shared_to_local_queue(counter)
-    }
-
-    pub fn spawn_local<Fut>(&self, future: Fut) -> JoinHandle<Fut::Output>
-    where
-        Fut: Future + 'static,
-        Fut::Output: 'static,
-    {
-        let (task, join) = LocalScheduler::spawn(self.worker_id, self.runtime_ctx.clone(), future);
-        self.add_task_to_local_queue(task);
-        join
     }
 
     /// # Safety
@@ -100,7 +104,7 @@ impl LocalContext {
     /// To uphold safety, Called should not call any other function.
     ///
     /// Caller must **only mutate** [`VecDeque`]
-    pub unsafe fn local_queue<F, R>(&self, f: F) -> R
+    pub(crate) unsafe fn local_queue<F, R>(&self, f: F) -> R
     where
         F: FnOnce(&mut VecDeque<Task>) -> R,
     {
@@ -108,7 +112,7 @@ impl LocalContext {
     }
 
     /// ## See: safety docs [`LocalContext::local_queue`]
-    pub unsafe fn timers<F, R>(&self, f: F) -> R
+    pub(crate) unsafe fn timers<F, R>(&self, f: F) -> R
     where
         F: FnOnce(&mut Timers) -> R,
     {
@@ -116,7 +120,7 @@ impl LocalContext {
     }
 
     /// Safety: the caller must ensure not to call this funtion in [`LocalContext::local_queue`] closure.
-    pub fn move_tasks_from_shared_to_local_queue(&self, counter: Counter) {
+    pub(crate) fn move_tasks_from_shared_to_local_queue(&self, counter: Counter) {
         let count = counter.shared();
         if count > 0 {
             let shared_queue = self.shared_queue();
@@ -129,16 +133,16 @@ impl LocalContext {
     }
 
     #[inline]
-    pub fn task_counter(&self) -> &TaskCounter {
+    pub(crate) fn task_counter(&self) -> &TaskCounter {
         self.runtime_ctx.workers.task_counter(self.worker_id)
     }
 
-    pub fn notifier(&self) -> &worker::Notifier {
+    pub(crate) fn notifier(&self) -> &worker::Notifier {
         self.runtime_ctx.workers.notifier(self.worker_id)
     }
 
     #[inline]
-    pub fn shared_queue(&self) -> &SharedQueue {
+    pub(crate) fn shared_queue(&self) -> &SharedQueue {
         self.runtime_ctx.workers.shared_queue(self.worker_id)
     }
 }
