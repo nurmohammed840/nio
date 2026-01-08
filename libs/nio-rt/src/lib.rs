@@ -24,7 +24,7 @@ pub use timer::{
 pub struct RuntimeBuilder {
     worker_threads: u8,
     worker_stack_size: Option<NonZeroUsize>,
-    worker_name: Box<dyn Fn(u8) -> String>,
+    worker_name: Box<dyn Fn(u8) -> String + Send + Sync>,
 
     event_interval: u32,
 
@@ -102,7 +102,7 @@ impl RuntimeBuilder {
 
     pub fn worker_name<F>(mut self, f: F) -> Self
     where
-        F: Fn(u8) -> String + 'static,
+        F: Fn(u8) -> String + 'static + Send + Sync,
     {
         self.worker_name = Box::new(f);
         self
