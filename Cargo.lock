@@ -1066,7 +1066,6 @@ dependencies = [
 name = "nio-rt"
 version = "0.1.0"
 dependencies = [
- "bytes",
  "crossbeam-queue",
  "futures-io",
  "futures-lite",
@@ -1076,6 +1075,7 @@ dependencies = [
  "nio-task",
  "nio-threadpool",
  "tokio",
+ "tokio-test",
 ]
 
 [[package]]

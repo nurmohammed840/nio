@@ -9,62 +9,42 @@ use std::time::{Duration, Instant};
 // The names of these structs behaves better when sorted.
 // Send: Yes, Sync: Yes
 #[derive(Clone)]
-#[allow(unused)]
 struct YY {}
 
 // Send: Yes, Sync: No
 #[derive(Clone)]
-#[allow(unused)]
 struct YN {
     _value: Cell<u8>,
 }
 
 // Send: No, Sync: No
 #[derive(Clone)]
-#[allow(unused)]
 struct NN {
     _value: Rc<u8>,
 }
 
-#[allow(dead_code)]
 type BoxFutureSync<T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send + Sync>>;
-#[allow(dead_code)]
 type BoxFutureSend<T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send>>;
-#[allow(dead_code)]
 type BoxFuture<T> = std::pin::Pin<Box<dyn std::future::Future<Output = T>>>;
 
-#[allow(dead_code)]
-type BoxAsyncRead = std::pin::Pin<Box<dyn tokio::io::AsyncBufRead + Send + Sync>>;
-#[allow(dead_code)]
-type BoxAsyncSeek = std::pin::Pin<Box<dyn tokio::io::AsyncSeek + Send + Sync>>;
-#[allow(dead_code)]
-type BoxAsyncWrite = std::pin::Pin<Box<dyn tokio::io::AsyncWrite + Send + Sync>>;
-
-#[allow(dead_code)]
 fn require_send<T: Send>(_t: &T) {}
-#[allow(dead_code)]
 fn require_sync<T: Sync>(_t: &T) {}
-#[allow(dead_code)]
 fn require_unpin<T: Unpin>(_t: &T) {}
 
-#[allow(dead_code)]
 struct Invalid;
 
-#[allow(unused)]
 trait AmbiguousIfSend<A> {
     fn some_item(&self) {}
 }
 impl<T: ?Sized> AmbiguousIfSend<()> for T {}
 impl<T: ?Sized + Send> AmbiguousIfSend<Invalid> for T {}
 
-#[allow(unused)]
 trait AmbiguousIfSync<A> {
     fn some_item(&self) {}
 }
 impl<T: ?Sized> AmbiguousIfSync<()> for T {}
 impl<T: ?Sized + Sync> AmbiguousIfSync<Invalid> for T {}
 
-#[allow(unused)]
 trait AmbiguousIfUnpin<A> {
     fn some_item(&self) {}
 }
@@ -236,6 +216,31 @@ cfg_not_wasi! {
 // async_assert_fn!(tokio::net::lookup_host(SocketAddr): Send & Sync & !Unpin);
 async_assert_fn!(nio_rt::net::TcpReader::peek(_, &mut [u8]): !Send & !Sync & Unpin);
 
+assert_value!(nio_rt::JoinHandle<NN>: !Send & !Sync & Unpin);
+assert_value!(nio_rt::JoinHandle<YN>: Send & Sync & Unpin);
+assert_value!(nio_rt::JoinHandle<YY>: Send & Sync & Unpin);
+
+assert_value!(nio_rt::RuntimeBuilder: Send & Sync & Unpin);
+assert_value!(nio_rt::RuntimeContext: Send & Sync & Unpin);
+assert_value!(nio_rt::Runtime: Send & Sync & Unpin);
+
+assert_value!(nio_rt::Interval: !Send & !Sync & Unpin);
+assert_value!(nio_rt::Sleep: !Send & !Sync & Unpin);
+assert_value!(nio_rt::Timeout<BoxFutureSync<()>>: !Send & !Sync & Unpin);
+assert_value!(nio_rt::Timeout<BoxFutureSend<()>>: !Send & !Sync & Unpin);
+assert_value!(nio_rt::Timeout<BoxFuture<()>>: !Send & !Sync & Unpin);
+async_assert_fn!(nio_rt::sleep(Duration): !Send & !Sync & Unpin);
+async_assert_fn!(nio_rt::Sleep::at(Instant): !Send & !Sync & Unpin);
+async_assert_fn!(nio_rt::timeout(Duration, BoxFutureSync<()>): !Send & !Sync & Unpin);
+async_assert_fn!(nio_rt::timeout(Duration, BoxFutureSend<()>): !Send & !Sync & Unpin);
+async_assert_fn!(nio_rt::timeout(Duration, BoxFuture<()>): !Send & !Sync & Unpin);
+// async_assert_fn!(nio_rt::Timeout::at(Instant, BoxFutureSync<()>): !Send & !Sync & !Unpin);
+// async_assert_fn!(nio_rt::Timeout::at(Instant, BoxFutureSend<()>): !Send & !Sync & Unpin);
+// async_assert_fn!(nio_rt::Timeout::at(Instant, BoxFuture<()>): !Send & !Sync & !Unpin);
+async_assert_fn!(nio_rt::Interval::tick(_): !Send & !Sync & Unpin);
+
+assert_value!(nio_rt::LocalContext: !Send & !Sync & Unpin);
+
 // #[cfg(unix)]
 // mod unix_datagram {
 //     use super::*;
@@ -328,24 +333,3 @@ async_assert_fn!(nio_rt::net::TcpReader::peek(_, &mut [u8]): !Send & !Sync & Unp
 //     async_assert_fn!(tokio::signal::windows::CtrlC::recv(_): Send & Sync & !Unpin);
 //     async_assert_fn!(tokio::signal::windows::CtrlBreak::recv(_): Send & Sync & !Unpin);
 // }
-
-assert_value!(nio_rt::RuntimeBuilder: Send & Sync & Unpin);
-assert_value!(nio_rt::RuntimeContext: Send & Sync & Unpin);
-assert_value!(nio_rt::Runtime: Send & Sync & Unpin);
-
-assert_value!(nio_rt::Interval: !Send & !Sync & Unpin);
-assert_value!(nio_rt::Sleep: !Send & !Sync & Unpin);
-assert_value!(nio_rt::Timeout<BoxFutureSync<()>>: !Send & !Sync & Unpin);
-assert_value!(nio_rt::Timeout<BoxFutureSend<()>>: !Send & !Sync & Unpin);
-assert_value!(nio_rt::Timeout<BoxFuture<()>>: !Send & !Sync & Unpin);
-async_assert_fn!(nio_rt::sleep(Duration): !Send & !Sync & Unpin);
-async_assert_fn!(nio_rt::Sleep::at(Instant): !Send & !Sync & Unpin);
-async_assert_fn!(nio_rt::timeout(Duration, BoxFutureSync<()>): !Send & !Sync & Unpin);
-async_assert_fn!(nio_rt::timeout(Duration, BoxFutureSend<()>): !Send & !Sync & Unpin);
-async_assert_fn!(nio_rt::timeout(Duration, BoxFuture<()>): !Send & !Sync & Unpin);
-// async_assert_fn!(nio_rt::Timeout::at(Instant, BoxFutureSync<()>): !Send & !Sync & !Unpin);
-// async_assert_fn!(nio_rt::Timeout::at(Instant, BoxFutureSend<()>): !Send & !Sync & Unpin);
-// async_assert_fn!(nio_rt::Timeout::at(Instant, BoxFuture<()>): !Send & !Sync & !Unpin);
-async_assert_fn!(nio_rt::Interval::tick(_): !Send & !Sync & Unpin);
-
-assert_value!(nio_rt::LocalContext: !Send & !Sync & Unpin);
