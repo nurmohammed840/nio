@@ -42,28 +42,34 @@ where
     }
 }
 
+const RUNNING: u8 = 0;
+const NOTIFIED: u8 = 1;
+const SLEEP: u8 = 2;
+
 #[derive(Default)]
 struct Signal {
     state: Mutex<u8>,
     signal: Condvar,
 }
 
-const NOTIFIED: u8 = 0;
-const SLEEP: u8 = 1;
-
 impl Signal {
     /// State transitions:
     ///
     /// ```text
-    /// NOTIFIED -> (SLEEP? -> NOTIFIED)* -> Complete?
+    /// RUNNING -> (SLEEP? -> NOTIFIED -> RUNNING)* -> Complete?
     /// ```
     fn wait_for_wakeup(&self) {
         let mut state = self.state.lock().unwrap();
-        *state = SLEEP;
-        'spurious_wakeups: loop {
-            state = self.signal.wait(state).unwrap();
-            if *state == NOTIFIED {
-                break 'spurious_wakeups;
+        if *state == NOTIFIED {
+            *state = RUNNING;
+        } else {
+            *state = SLEEP;
+            'spurious_wakeups: loop {
+                state = self.signal.wait(state).unwrap();
+                if *state == NOTIFIED {
+                    *state = RUNNING;
+                    break 'spurious_wakeups;
+                }
             }
         }
     }

@@ -1,2 +1,2 @@
 [env]
-MIRIFLAGS = "-Zmiri-ignore-leaks -Zmiri-disable-isolation -Zmiri-strict-provenance -Zmiri-retag-fields"
+MIRIFLAGS = "-Zmiri-ignore-leaks -Zmiri-disable-isolation -Zmiri-strict-provenance"

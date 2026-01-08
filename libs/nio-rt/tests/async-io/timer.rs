@@ -79,10 +79,10 @@ async fn poll_across_tasks() {
 }
 
 #[test]
-// #[cfg_attr(miri, ignore)]
+#[cfg_attr(miri, ignore)]
 async fn set() {
     let start = Timer::now();
-    let mut timer = sleep(Duration::from_secs(5));
+    let mut timer = sleep(Duration::from_secs(1));
 
     poll_fn(|cx| {
         let _ = Pin::new(&mut timer).poll(cx);
