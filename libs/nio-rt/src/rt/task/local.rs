@@ -89,10 +89,13 @@ impl<F: Future> Future for LocalFuture<F> {
     type Output = F::Output;
     #[inline]
     fn poll(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
-        debug_assert!(
-            is_same_worker(|id| self.worker_id == id),
-            "local task polled by a thread that didn't spawn it"
-        );
-        unsafe { self.map_unchecked_mut(|c| &mut *c.fut).poll(cx) }
+        unsafe {
+            let this = self.get_unchecked_mut();
+            debug_assert!(
+                is_same_worker(|id| this.worker_id == id),
+                "local task polled by a thread that didn't spawn it"
+            );
+            Pin::new_unchecked(&mut *this.fut).poll(cx)
+        }
     }
 }

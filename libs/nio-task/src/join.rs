@@ -44,8 +44,6 @@ impl<T> JoinHandle<T> {
     }
 }
 
-impl<T> Unpin for JoinHandle<T> {}
-
 impl<T> Future for JoinHandle<T> {
     type Output = Result<T, JoinError>;
 

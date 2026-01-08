@@ -1,4 +1,4 @@
-use nio_rt::spawn_local;
+use nio_rt::{spawn_local, test};
 use std::{
     future::{Future, poll_fn},
     pin::Pin,
@@ -9,7 +9,7 @@ async fn waker() -> std::task::Waker {
     poll_fn(|cx| Poll::Ready(cx.waker().clone())).await
 }
 
-#[nio_rt::test]
+#[test]
 async fn wakers_are_different() {
     let w1 = waker().await;
 
@@ -32,7 +32,7 @@ async fn wakers_are_different() {
     .unwrap();
 }
 
-#[nio_rt::test]
+#[test]
 async fn doesnt_poll_after_ready() {
     #[derive(Default)]
     struct Bomb {
@@ -51,4 +51,20 @@ async fn doesnt_poll_after_ready() {
         }
     }
     Bomb::default().await
+}
+
+#[test]
+async fn yield_now() {
+    let mut yielded = false;
+
+    let yield_now = poll_fn(|cx| {
+        if yielded {
+            return Poll::Ready(());
+        }
+        yielded = true;
+        cx.waker().wake_by_ref();
+        Poll::Pending
+    });
+
+    yield_now.await;
 }

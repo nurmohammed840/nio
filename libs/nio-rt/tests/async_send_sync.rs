@@ -234,9 +234,9 @@ async_assert_fn!(nio_rt::Sleep::at(Instant): !Send & !Sync & Unpin);
 async_assert_fn!(nio_rt::timeout(Duration, BoxFutureSync<()>): !Send & !Sync & Unpin);
 async_assert_fn!(nio_rt::timeout(Duration, BoxFutureSend<()>): !Send & !Sync & Unpin);
 async_assert_fn!(nio_rt::timeout(Duration, BoxFuture<()>): !Send & !Sync & Unpin);
-// async_assert_fn!(nio_rt::Timeout::at(Instant, BoxFutureSync<()>): !Send & !Sync & !Unpin);
-// async_assert_fn!(nio_rt::Timeout::at(Instant, BoxFutureSend<()>): !Send & !Sync & Unpin);
-// async_assert_fn!(nio_rt::Timeout::at(Instant, BoxFuture<()>): !Send & !Sync & !Unpin);
+async_assert_fn!(nio_rt::Timeout::at(Instant, BoxFutureSync<()>): !Send & !Sync & Unpin);
+async_assert_fn!(nio_rt::Timeout::at(Instant, BoxFutureSend<()>): !Send & !Sync & Unpin);
+async_assert_fn!(nio_rt::Timeout::at(Instant, BoxFuture<()>): !Send & !Sync & Unpin);
 async_assert_fn!(nio_rt::Interval::tick(_): !Send & !Sync & Unpin);
 
 assert_value!(nio_rt::LocalContext: !Send & !Sync & Unpin);

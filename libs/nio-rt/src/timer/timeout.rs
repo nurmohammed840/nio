@@ -12,12 +12,10 @@ pub struct Timeout<Fut> {
     fut: Fut,
 }
 
-impl<F> Unpin for Timeout<F> {}
-
 impl<T> Timeout<T> {
     pub fn at<F>(deadline: Instant, future: F) -> Timeout<F::IntoFuture>
     where
-        F: IntoFuture,
+        F: IntoFuture<IntoFuture = T>,
     {
         Timeout {
             delay: Sleep::at(deadline),
