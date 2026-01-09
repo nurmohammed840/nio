@@ -39,6 +39,7 @@ impl Sleep {
 }
 
 #[inline]
+#[must_use]
 pub fn sleep(duration: Duration) -> Sleep {
     LocalContext::with(|ctx| unsafe {
         ctx.timers(|timers| timers.sleep_at(timers.clock.current() + duration))

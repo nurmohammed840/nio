@@ -18,7 +18,6 @@ async fn smoke() {
 
 #[test]
 #[ignore]
-#[cfg_attr(miri, ignore)]
 async fn interval() {
     let period = Duration::from_secs(1);
     let jitter = Duration::from_millis(500);
