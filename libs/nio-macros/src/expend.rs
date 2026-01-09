@@ -92,46 +92,17 @@ pub fn nio_main(
     });
 
     let mut out = TokenStream::new();
-
-    if sig.inputs.is_empty() {
-        quote!(out, {
-            #attrs
-            #test_attr
-            #vis #sig {
-                #crate_path::RuntimeBuilder::new()
-                    #test_config
-                    #config
-                    .rt()
-                    .unwrap()
-                    .block_on(|| #async_keyword #body)
-            }
-        });
-    } else {
-        let name = &sig.ident;
-        let args = quote_rep(&sig.inputs, |t, arg| match arg {
-            syn::FnArg::Receiver(_) => {
-                panic!("using the `self` keyword is not supported; try `this: Type` instead");
-            }
-            syn::FnArg::Typed(pat_type) => {
-                let arg = &pat_type.pat;
-                quote!(t, { #arg, });
-            }
-        });
-
-        quote!(out, {
-            #attrs
-            #test_attr
-            #vis #sig {
-                #async_keyword #sig #body
-
-                #crate_path::RuntimeBuilder::new()
-                    #test_config
-                    #config
-                    .rt()
-                    .unwrap()
-                    .block_on(|| #name(#args))
-            }
-        });
-    }
+    quote!(out, {
+        #attrs
+        #test_attr
+        #vis #sig {
+            #crate_path::RuntimeBuilder::new()
+                #test_config
+                #config
+                .rt()
+                .unwrap()
+                .block_on(|| #async_keyword move #body)
+        }
+    });
     out
 }
