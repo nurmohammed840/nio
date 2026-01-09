@@ -125,40 +125,42 @@ impl Workers {
         let task_counter = context.task_counter();
 
         loop {
-            let mut tick = Tick(tick);
-            'event_interval: while !tick.is_empty() {
-                match unsafe { context.local_queue(|q| q.pop_front()) } {
-                    Some(task) => match task.poll() {
-                        Status::Yielded(task) => {
-                            unsafe { context.local_queue(|q| q.push_back(task)) };
-                        }
-                        Status::Pending | Status::Complete(_) => {
-                            tick.step();
-                            let counter = task_counter.decrease_local();
-                            context.move_tasks_from_shared_to_local_queue(counter);
-                        }
-                    },
-                    None => {
-                        notifier.accept_notify_once();
-
-                        let counter = task_counter.load();
-                        if counter.shared_queue_has_data() {
-                            context.move_tasks_from_shared_to_local_queue(counter);
-                        } else {
-                            break 'event_interval;
-                        }
+            for _ in 0..tick {
+                let Some(task) = (unsafe { context.local_queue(|q| q.pop_front()) }) else {
+                    // Local queue is empty; accept notification from other threads.
+                    notifier.accept_notify_once();
+                    break;
+                };
+                match task.poll() {
+                    Status::Yielded(task) => {
+                        unsafe { context.local_queue(|q| q.push_back(task)) };
+                    }
+                    Status::Pending | Status::Complete(_) => {
+                        let counter = task_counter.decrease_local();
+                        context.move_tasks_from_shared_to_local_queue(counter);
                     }
                 }
             }
+
+            let counter = task_counter.load();
+            let queue_is_not_empty = if counter.shared_queue_has_data() {
+                context.move_tasks_from_shared_to_local_queue(counter);
+                true
+            } else {
+                unsafe { context.local_queue(|q| !q.is_empty()) }
+            };
 
             let (timers, timeout) = unsafe {
                 context.timers(|timer| {
                     let now = timer.clock.now();
                     let elapsed = timer.fetch(now);
 
-                    let timeout = if elapsed.is_some() || tick.is_empty() {
+                    let timeout = if queue_is_not_empty || elapsed.is_some() {
+                        // Do not sleep; We have more work to do.
                         Some(Duration::ZERO)
                     } else {
+                        // No immediate work; Sleep until the next timer fires,
+                        // or until woken by an I/O event or another thread send more task.
                         timer.next_timeout(now)
                     };
                     (elapsed, timeout)
@@ -190,16 +192,5 @@ impl Workers {
                 unsafe { (*ptr).notify(event) };
             }
         }
-    }
-}
-
-struct Tick(u32);
-
-impl Tick {
-    fn is_empty(&self) -> bool {
-        self.0 == 0
-    }
-    fn step(&mut self) {
-        self.0 -= 1;
     }
 }
