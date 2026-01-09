@@ -1074,6 +1074,7 @@ dependencies = [
  "nio-macro",
  "nio-task",
  "nio-threadpool",
+ "pin-project-lite",
  "tokio",
  "tokio-test",
 ]

@@ -29,6 +29,7 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 tokio = { version = "1", features = ["full"] }
 futures-lite = { version = "2" }
 tokio-test = { version = "0.4.0" }
+pin-project-lite = "*"
 # bytes = { version = "1" }
 
 

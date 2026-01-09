@@ -23,43 +23,15 @@ impl RuntimeBuilder {
                 .name(self.thread_name.take().unwrap()),
         });
 
-        Ok(Runtime {
-            context,
-            config: self,
-            drivers,
-        })
-    }
-}
-
-pub struct Runtime {
-    config: RuntimeBuilder,
-    drivers: Box<[driver::Driver]>,
-    context: Arc<RuntimeContext>,
-}
-
-impl Runtime {
-    pub fn block_on<F, Fut>(self, fut: F) -> Fut::Output
-    where
-        F: FnOnce() -> Fut + Send,
-        Fut: Future + 'static,
-        Fut::Output: Send + 'static,
-    {
-        let Runtime {
-            config,
-            drivers,
-            context,
-        } = self;
-
-        let event_interval = config.event_interval;
         let local_queue_cap: usize = 512;
+        let event_interval = self.event_interval;
 
         for (id, driver) in drivers.into_iter().enumerate() {
             let id = id as u8;
             let context = context.clone();
             let worker_id = context.workers.id(id);
 
-            config
-                .create_thread(id)
+            self.create_thread(id)
                 .spawn(move || {
                     let io_registry = driver.registry_owned().unwrap();
                     Workers::job(
@@ -71,8 +43,26 @@ impl Runtime {
                 .unwrap_or_else(|err| panic!("failed to spawn worker thread {id}; {err}"));
         }
 
-        drop(config);
-        nio_future::block_on(context.spawn_pinned_at(0, fut)).unwrap()
+        Ok(Runtime { context })
+    }
+}
+
+pub struct Runtime {
+    context: Arc<RuntimeContext>,
+}
+
+impl Runtime {
+    pub fn context(&self) -> Arc<RuntimeContext> {
+        self.context.clone()
+    }
+
+    pub fn block_on<F, Fut>(&self, fut: F) -> Fut::Output
+    where
+        F: FnOnce() -> Fut + Send,
+        Fut: Future + 'static,
+        Fut::Output: Send + 'static,
+    {
+        nio_future::block_on(self.context.spawn_pinned_at(0, fut)).unwrap()
     }
 }
 
