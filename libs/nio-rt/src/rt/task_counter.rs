@@ -1,4 +1,7 @@
-use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
+use std::{
+    fmt,
+    sync::atomic::{AtomicU64, Ordering},
+};
 
 const SHARED_COUNTER_BIT_SIZE: u8 = 32;
 const SHARED_COUNTER_MASK: u64 = (1 << SHARED_COUNTER_BIT_SIZE) - 1;
@@ -35,9 +38,6 @@ impl Counter {
     }
 }
 
-// Using `atomic::Ordering::Relaxed` ordering is acceptable here because:
-// - We don't use counter to guard memory accesss.
-// - Used only for statistics purpose.
 impl TaskCounter {
     pub fn new() -> Self {
         Self {
@@ -46,18 +46,18 @@ impl TaskCounter {
     }
 
     pub fn increase_local(&self) -> Counter {
-        Counter(self.counter.fetch_add(LOCAL_COUNTER, Relaxed))
+        Counter(self.counter.fetch_add(LOCAL_COUNTER, Ordering::AcqRel))
     }
 
     pub fn decrease_local(&self) -> Counter {
-        let old = Counter(self.counter.fetch_sub(LOCAL_COUNTER, Relaxed));
+        let old = Counter(self.counter.fetch_sub(LOCAL_COUNTER, Ordering::AcqRel));
         debug_assert!(old.local() > 0);
         old
     }
 
     /// Only this function is allowed to call from other thread.
     pub fn increase_shared(&self) {
-        self.counter.fetch_add(SHARED_COUNTER, Relaxed);
+        self.counter.fetch_add(SHARED_COUNTER, Ordering::Release);
     }
 
     /// Remove `N` from SHARED_COUNTER
@@ -66,13 +66,24 @@ impl TaskCounter {
     /// SHARED_COUNTER -> LOCAL_COUNTER
     pub fn move_shared_to_local(&self, n: Counter) {
         let shared = n.shared();
-        self.counter
-            .fetch_add((shared << SHARED_COUNTER_BIT_SIZE) - shared, Relaxed);
+        self.counter.fetch_add(
+            (shared << SHARED_COUNTER_BIT_SIZE) - shared,
+            Ordering::Release,
+        );
     }
 
     #[inline]
     pub fn load(&self) -> Counter {
-        Counter(self.counter.load(Relaxed))
+        Counter(self.counter.load(Ordering::Acquire))
+    }
+}
+
+impl fmt::Debug for Counter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Counter")
+            .field("local", &self.local())
+            .field("shared", &self.shared())
+            .finish()
     }
 }
 

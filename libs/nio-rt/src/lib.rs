@@ -11,6 +11,7 @@ use std::{num::NonZeroUsize, time::Duration};
 
 pub use nio_macro::*;
 pub use rt::{
+    metrics,
     Runtime,
     context::{LocalContext, RuntimeContext},
     task::JoinHandle,

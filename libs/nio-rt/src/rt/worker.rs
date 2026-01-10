@@ -55,8 +55,8 @@ impl Notifier {
 
 pub struct Workers {
     notifiers: Box<[Notifier]>,
-    task_counters: Box<[TaskCounter]>,
     shared_queues: Box<[SharedQueue]>,
+    pub(crate) task_counters: Box<[TaskCounter]>,
 }
 
 impl Workers {

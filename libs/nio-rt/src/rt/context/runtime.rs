@@ -22,6 +22,10 @@ impl RuntimeContext {
         RuntimeContext::with(Arc::clone)
     }
 
+    pub fn metrics(self: Arc<Self>) -> metrics::RuntimeMetrics {
+        metrics::RuntimeMetrics { ctx: self }
+    }
+
     pub fn enter(self: Arc<Self>) {
         Context::enter(self);
     }
