@@ -3,15 +3,16 @@
 use nio_future::yield_now;
 use nio_rt::{spawn, spawn_local};
 
-use tokio::sync::oneshot;
-use tokio_test::assert_ok;
-
 use std::thread;
 use std::time::Duration;
 
 mod support {
+    pub mod futures;
     pub(crate) mod mpsc_stream;
 }
+
+use support::futures::sync::oneshot;
+use support::futures::test::assert_ok;
 
 #[test]
 fn no_extra_poll() {

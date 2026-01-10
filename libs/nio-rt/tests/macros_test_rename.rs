@@ -1,7 +1,7 @@
 #![cfg(not(target_os = "wasi"))] // Wasi doesn't support threading
 
 #[allow(unused_imports)]
-use std as tokio;
+use std as nio_rt;
 
 use ::nio_rt as nio_rt1;
 

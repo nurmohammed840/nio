@@ -3,11 +3,15 @@
 #![cfg(not(miri))]
 
 use nio_rt::{net::TcpListener, test};
-use tokio_test::assert_ok;
 
 use std::io::{Result, prelude::*};
 use std::net::TcpStream;
 use std::thread;
+
+mod support {
+    pub mod futures;
+}
+use support::futures::test::assert_ok;
 
 #[test]
 async fn echo_server() -> Result<()> {

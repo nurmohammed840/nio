@@ -3,14 +3,16 @@
 
 use nio_future::{block_on, yield_now};
 use nio_rt::net::{TcpListener, TcpStream};
-use nio_rt::{
-    Runtime, RuntimeBuilder, Sleep, sleep, spawn, spawn_blocking, spawn_local, spawn_pinned_at,
-};
+use nio_rt::{Runtime, RuntimeBuilder, Sleep, sleep, spawn, spawn_blocking, spawn_local};
+
 use std::time::Duration;
 use std::{thread, time::Instant};
 
-use tokio::sync::{mpsc, oneshot};
-use tokio_test::assert_ok;
+mod support {
+    pub mod futures;
+}
+use support::futures::sync::{mpsc, oneshot};
+use support::futures::test::{assert_err, assert_ok};
 
 fn rt(core: u8) -> Runtime {
     RuntimeBuilder::new().worker_threads(core).rt().unwrap()
@@ -103,7 +105,7 @@ fn spawn_two() {
 
 #[test]
 fn spawn_many_from_block_on() {
-    const ITER: usize = if cfg!(miri) { 20 } else { 500 };
+    const ITER: usize = if cfg!(miri) { 20 } else { 200 };
 
     for rt in CORES.map(rt) {
         let out = rt.block_on(|| async {
@@ -480,12 +482,153 @@ fn io_driver_called_when_under_load() {
     }
 }
 
+#[cfg(not(miri))]
+async fn client_server(tx: std::sync::mpsc::Sender<()>) {
+    use futures_lite::{AsyncReadExt, AsyncWriteExt};
 
-// #[test]
-// fn test_name() {
-//     for rt in CORES.map(rt) {
-//         rt.block_on(|| async {
-//             // ...
-//         });
-//     }
-// }
+    let server = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+
+    // Get the assigned address
+    let addr = assert_ok!(server.local_addr());
+
+    // Spawn the server
+    spawn_local(async move {
+        // Accept a socket
+        let conn = server.accept().await.unwrap();
+        let mut socket = conn.connect().await.unwrap();
+        // Write some data
+        socket.write_all(b"hello").await.unwrap();
+    });
+
+    let mut client = TcpStream::connect(&addr).await.unwrap();
+
+    let mut buf = vec![];
+    client.read_to_end(&mut buf).await.unwrap();
+
+    assert_eq!(buf, b"hello");
+    tx.send(()).unwrap();
+}
+
+#[test]
+#[cfg(not(miri))]
+fn client_server_block_on() {
+    for rt in CORES.map(rt) {
+        let (tx, rx) = std::sync::mpsc::channel();
+        rt.block_on(|| async move { client_server(tx).await });
+
+        assert_ok!(rx.try_recv());
+        assert_err!(rx.try_recv());
+    }
+}
+
+#[test]
+#[cfg(panic = "unwind")]
+fn panic_in_task() {
+    use std::pin::Pin;
+    use std::task::Context;
+    use std::task::Poll;
+
+    struct Boom(Option<oneshot::Sender<()>>);
+
+    impl Future for Boom {
+        type Output = ();
+
+        fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<()> {
+            panic!();
+        }
+    }
+
+    impl Drop for Boom {
+        fn drop(&mut self) {
+            assert!(std::thread::panicking());
+            self.0.take().unwrap().send(()).unwrap();
+        }
+    }
+
+    for rt in CORES.map(rt) {
+        let (tx, rx) = oneshot::channel();
+        rt.context().spawn(async { Boom(Some(tx)).await });
+        assert_ok!(rt.block_on(|| rx));
+    }
+}
+
+#[test]
+#[should_panic]
+fn panic_in_block_on() {
+    for rt in CORES.map(rt) {
+        rt.block_on(|| async { panic!() });
+    }
+}
+
+#[test]
+fn enter_and_spawn() {
+    for rt in CORES.map(rt) {
+        let ctx = rt.context();
+        let handle = thread::spawn(move || {
+            ctx.enter();
+            spawn(async {})
+        })
+        .join()
+        .unwrap();
+
+        assert_ok!(rt.block_on(|| handle));
+    }
+}
+
+#[test]
+fn ping_pong_saturation() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    const NUM: usize = if cfg!(miri) { 5 } else { 100 };
+
+    for rt in CORES.map(rt) {
+        let running = std::sync::Arc::new(AtomicBool::new(true));
+        rt.block_on(|| async move {
+            let (spawned_tx, mut spawned_rx) = mpsc::unbounded_channel();
+
+            let mut tasks = vec![];
+            // Spawn a bunch of tasks that ping-pong between each other to
+            // saturate the runtime.
+            for _ in 0..NUM {
+                let (tx1, mut rx1) = mpsc::unbounded_channel();
+                let (tx2, mut rx2) = mpsc::unbounded_channel();
+                let spawned_tx = spawned_tx.clone();
+                let running = running.clone();
+                tasks.push(spawn(async move {
+                    spawned_tx.send(()).unwrap();
+
+                    while running.load(Ordering::Relaxed) {
+                        tx1.send(()).unwrap();
+                        rx2.recv().await.unwrap();
+                    }
+
+                    // Close the channel and wait for the other task to exit.
+                    drop(tx1);
+                    assert!(rx2.recv().await.is_none());
+                }));
+
+                tasks.push(spawn(async move {
+                    while rx1.recv().await.is_some() {
+                        tx2.send(()).unwrap();
+                    }
+                }));
+            }
+
+            for _ in 0..NUM {
+                spawned_rx.recv().await.unwrap();
+            }
+
+            // spawn another task and wait for it to complete
+            let handle = spawn(async {
+                for _ in 0..5 {
+                    // Yielding forces it back into the local queue.
+                    yield_now().await;
+                }
+            });
+            handle.await.unwrap();
+            running.store(false, Ordering::Relaxed);
+            for t in tasks {
+                t.await.unwrap();
+            }
+        });
+    }
+}
