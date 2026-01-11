@@ -10,11 +10,12 @@ mod utils;
 use std::{num::NonZeroUsize, time::Duration};
 
 pub use nio_macro::*;
+pub use nio_task::{AbortHandle, JoinError, JoinHandle, TaskId};
+pub use nio_task::id as task_id;
 pub use rt::{
-    metrics,
     Runtime,
     context::{LocalContext, RuntimeContext},
-    task::JoinHandle,
+    metrics,
 };
 pub use timer::{
     interval::{Interval, interval},

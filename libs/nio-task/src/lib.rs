@@ -15,7 +15,7 @@ use crate::raw::*;
 pub use abort::AbortHandle;
 pub use blocking::BlockingTask;
 pub use error::JoinError;
-pub use id::Id;
+pub use id::{TaskId, id};
 pub use join::JoinHandle;
 
 use state::*;
@@ -87,8 +87,8 @@ impl<M: Debug> Debug for Metadata<M> {
 }
 
 impl<M> Metadata<M> {
-    pub fn id(&self) -> Id {
-        Id::new(&self.raw)
+    pub fn id(&self) -> TaskId {
+        TaskId::new(&self.raw)
     }
 
     pub fn get(&self) -> &M {
@@ -269,8 +269,8 @@ impl<M> Task<M> {
     }
 
     #[inline]
-    pub fn id(&self) -> Id {
-        Id::new(unsafe { self.raw.as_ref().unwrap_unchecked() })
+    pub fn id(&self) -> TaskId {
+        TaskId::new(unsafe { self.raw.as_ref().unwrap_unchecked() })
     }
 }
 

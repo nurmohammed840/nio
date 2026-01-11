@@ -1,6 +1,6 @@
 use crate::raw::{Fut, Header, PollStatus, RawTask, RawTaskVTable};
 use crate::waker::NOOP_WAKER;
-use crate::{Id, JoinError, JoinHandle};
+use crate::{TaskId, JoinError, JoinHandle};
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::task::{Poll, Waker};
@@ -33,8 +33,8 @@ impl BlockingTask {
     }
 
     #[inline]
-    pub fn id(&self) -> Id {
-        Id::new(&self.raw)
+    pub fn id(&self) -> TaskId {
+        TaskId::new(&self.raw)
     }
 }
 

@@ -1,0 +1,51 @@
+use nio_rt::{spawn, spawn_local, task_id, test};
+
+#[test]
+async fn task_id_check() {
+    let id = task_id().await;
+    let _id = async { task_id().await }.await;
+    assert_eq!(id, _id);
+}
+
+#[test]
+async fn task_id_local() {
+    let jh = spawn_local(async { task_id().await });
+    let id1 = jh.abort_handle().id();
+    let id2 = jh.id();
+    let id3 = jh.await.unwrap();
+
+    assert_eq!(id1, id2);
+    assert_eq!(id1, id3);
+    assert_eq!(id2, id3);
+}
+
+#[test]
+async fn task_id_spawn() {
+    let jh = spawn(async { task_id().await });
+    let id1 = jh.abort_handle().id();
+    let id2 = jh.id();
+    let id3 = jh.await.unwrap();
+
+    assert_eq!(id1, id2);
+    assert_eq!(id1, id3);
+    assert_eq!(id2, id3);
+}
+
+#[test]
+async fn task_id_collision_local() {
+    let h1 = spawn_local(async { task_id().await });
+    let h2 = spawn_local(async { task_id().await });
+
+    let (id1, id2) = futures::join!(h1, h2);
+    assert_ne!(id1.unwrap(), id2.unwrap());
+}
+
+#[test]
+async fn task_id_collision_spawn() {
+    let h1 = spawn(async { task_id().await });
+    let h2 = spawn(async { task_id().await });
+
+    let (id1, id2) = futures::join!(h1, h2);
+    assert_ne!(id1.unwrap(), id2.unwrap());
+}
+

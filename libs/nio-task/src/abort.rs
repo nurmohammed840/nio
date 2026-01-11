@@ -1,6 +1,6 @@
 use std::fmt;
 
-use super::{COMPLETE, RawTask, id::Id};
+use super::{COMPLETE, RawTask, id::TaskId};
 
 #[derive(Clone)]
 pub struct AbortHandle {
@@ -25,8 +25,8 @@ impl AbortHandle {
         self.raw.header().state.load().has(COMPLETE)
     }
 
-    pub fn id(&self) -> Id {
-        Id::new(&self.raw)
+    pub fn id(&self) -> TaskId {
+        TaskId::new(&self.raw)
     }
 }
 

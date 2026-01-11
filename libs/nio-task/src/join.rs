@@ -1,6 +1,6 @@
 use crate::{AbortHandle, raw::RawTask};
 
-use super::{COMPLETE, error::JoinError, id::Id};
+use super::{COMPLETE, error::JoinError, id::TaskId};
 use std::{
     fmt,
     future::Future,
@@ -39,8 +39,8 @@ impl<T> JoinHandle<T> {
         self.raw.header().state.load().has(COMPLETE)
     }
 
-    pub fn id(&self) -> Id {
-        Id::new(&self.raw)
+    pub fn id(&self) -> TaskId {
+        TaskId::new(&self.raw)
     }
 }
 
