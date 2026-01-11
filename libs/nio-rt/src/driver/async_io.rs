@@ -50,7 +50,7 @@ impl<Io: Source> AsyncIO<Io> {
         })
     }
 
-    pub fn async_io_write<'a, F, T>(
+    pub fn io_write<'a, F, T>(
         &'a self,
         mut f: F,
     ) -> PollFn<impl FnMut(&mut Context) -> Poll<Result<T>> + use<'a, F, Io, T>>
@@ -168,7 +168,7 @@ impl<Io: Source> AsyncIO<Io> {
     where
         &'a Io: Write,
     {
-        let mut poll_fn = self.async_io_write(|mut io| Write::write_vectored(&mut io, bufs));
+        let mut poll_fn = self.io_write(|mut io| Write::write_vectored(&mut io, bufs));
         Pin::new(&mut poll_fn).poll(cx)
     }
 }

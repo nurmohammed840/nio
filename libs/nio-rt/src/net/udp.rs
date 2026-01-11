@@ -29,20 +29,23 @@ impl UdpSocket {
         future::ready(bind(addr, |addr| self.0.io.connect(addr)))
     }
 
-    pub fn send<'b>(&self, buf: &'b [u8]) -> impl Future<Output = Result<usize>> + use<'_, 'b> {
-        self.0.async_io_write(|io| io.send(buf))
+    pub fn send<'b>(&mut self, buf: &'b [u8]) -> impl Future<Output = Result<usize>> + use<'_, 'b> {
+        self.0.io_write(|io| io.send(buf))
     }
 
-    pub fn recv<'b>(&mut self, buf: &'b mut [u8]) -> impl Future<Output = Result<usize>> + use<'_, 'b> {
+    pub fn recv<'b>(
+        &mut self,
+        buf: &'b mut [u8],
+    ) -> impl Future<Output = Result<usize>> + use<'_, 'b> {
         self.0.io_read(|io| io.recv(buf))
     }
 
     pub fn send_to<'b>(
-        &self,
+        &mut self,
         buf: &'b [u8],
         target: SocketAddr,
     ) -> impl Future<Output = Result<usize>> + use<'_, 'b> {
-        self.0.async_io_write(move |io| io.send_to(buf, target))
+        self.0.io_write(move |io| io.send_to(buf, target))
     }
 
     pub fn recv_from<'b>(
@@ -59,7 +62,10 @@ impl UdpSocket {
         self.0.io_read(|io| io.peek_from(buf))
     }
 
-    pub fn peek<'b>(&mut self, buf: &'b mut [u8]) -> impl Future<Output = Result<usize>> + use<'_, 'b> {
+    pub fn peek<'b>(
+        &mut self,
+        buf: &'b mut [u8],
+    ) -> impl Future<Output = Result<usize>> + use<'_, 'b> {
         self.0.io_read(|io| io.peek(buf))
     }
 
