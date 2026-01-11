@@ -13,10 +13,6 @@ use support::futures;
 use support::futures::sync::oneshot;
 use support::futures::test::assert_ok;
 
-fn rt(core: u8) -> Runtime {
-    RuntimeBuilder::new().worker_threads(core).rt().unwrap()
-}
-
 fn multi() -> Runtime {
     RuntimeBuilder::new().rt().unwrap()
 }
@@ -214,4 +210,3 @@ fn multi_threadpool() {
 
     done_rx.recv().unwrap();
 }
-
