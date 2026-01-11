@@ -1,5 +1,6 @@
 use crate::net::TcpStream;
-use std::io::{Error, IoSlice};
+use std::future::poll_fn;
+use std::io::{Error, IoSlice, Write};
 use std::net::{Shutdown, SocketAddr};
 use std::rc::Rc;
 use std::task::{Context, Poll};
@@ -59,9 +60,16 @@ impl TcpReader {
         self.0.0.io_read(|io| io.peek(buf))
     }
 
+    pub fn read<'b>(
+        &mut self,
+        buf: &'b mut [u8],
+    ) -> impl Future<Output = Result<usize>> + use<'_, 'b> {
+        poll_fn(|cx| self.0.0.poll_read(cx, buf))
+    }
+
     #[inline]
-    pub fn poll_read(&self, cx: &mut Context, buf: &mut [u8]) -> Poll<Result<usize>> {
-        self.0.poll_read(cx, buf)
+    pub(crate) fn poll_read(&self, cx: &mut Context, buf: &mut [u8]) -> Poll<Result<usize>> {
+        self.0.0.poll_read(cx, buf)
     }
 }
 
@@ -81,13 +89,33 @@ impl TcpWriter {
         self.stream.local_addr()
     }
 
-    #[inline]
-    pub fn poll_write(&self, cx: &mut Context, buf: &[u8]) -> Poll<Result<usize>> {
-        self.stream.poll_write(cx, buf)
+    pub fn write<'b>(
+        &mut self,
+        buf: &'b [u8],
+    ) -> impl Future<Output = Result<usize>> + use<'_, 'b> {
+        poll_fn(|cx| self.stream.0.poll_write(cx, buf))
+    }
+
+    pub fn write_vectored<'b>(
+        &mut self,
+        bufs: &'b [IoSlice],
+    ) -> impl Future<Output = Result<usize>> + use<'_, 'b> {
+        self.stream
+            .0
+            .io_write(|mut io| Write::write_vectored(&mut io, bufs))
     }
 
     #[inline]
-    pub fn poll_write_vectored(&self, cx: &mut Context, bufs: &[IoSlice]) -> Poll<Result<usize>> {
+    pub(crate) fn poll_write(&self, cx: &mut Context, buf: &[u8]) -> Poll<Result<usize>> {
+        self.stream.0.poll_write(cx, buf)
+    }
+
+    #[inline]
+    pub(crate) fn poll_write_vectored(
+        &self,
+        cx: &mut Context,
+        bufs: &[IoSlice],
+    ) -> Poll<Result<usize>> {
         self.stream.poll_write_vectored(cx, bufs)
     }
 }

@@ -2,8 +2,7 @@ use crate::{driver::IoWaker, rt::context::LocalContext};
 use mio::{Interest, event::Source};
 use std::{
     future::{PollFn, poll_fn},
-    io::{ErrorKind, IoSlice, Read, Result, Write},
-    pin::Pin,
+    io::{ErrorKind, Read, Result, Write},
     task::{Context, Poll},
 };
 
@@ -73,21 +72,7 @@ impl<Io: Source> AsyncIO<Io> {
         })
     }
 
-    pub fn _poll_read_readiness(
-        &self,
-    ) -> PollFn<impl FnMut(&mut Context) -> Poll<()> + use<'_, Io>> {
-        poll_fn(move |cx| {
-            self.waker.reader.register(cx);
-            if self.waker.readiness().is_readable() {
-                return Poll::Ready(());
-            }
-            Poll::Pending
-        })
-    }
-
-    pub fn poll_write_readiness(
-        &self,
-    ) -> PollFn<impl FnMut(&mut Context) -> Poll<()> + use<'_, Io>> {
+    pub fn io_writable(&self) -> PollFn<impl FnMut(&mut Context) -> Poll<()> + use<'_, Io>> {
         poll_fn(move |cx| {
             self.waker.writer.register(cx);
             if self.waker.readiness().is_writable() {
@@ -158,18 +143,6 @@ impl<Io: Source> AsyncIO<Io> {
             }
         }
         Poll::Pending
-    }
-
-    pub fn poll_write_vectored<'a>(
-        &'a self,
-        cx: &mut Context,
-        bufs: &[IoSlice],
-    ) -> Poll<Result<usize>>
-    where
-        &'a Io: Write,
-    {
-        let mut poll_fn = self.io_write(|mut io| Write::write_vectored(&mut io, bufs));
-        Pin::new(&mut poll_fn).poll(cx)
     }
 }
 
