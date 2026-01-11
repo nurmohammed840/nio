@@ -56,7 +56,7 @@ impl TcpReader {
         &mut self,
         buf: &'b mut [u8],
     ) -> impl Future<Output = Result<usize>> + use<'_, 'b> {
-        self.0.peek(buf)
+        self.0.0.io_read(|io| io.peek(buf))
     }
 
     #[inline]

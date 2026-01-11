@@ -27,7 +27,7 @@ impl<Io: Source> AsyncIO<Io> {
         Ok(Self { io, waker })
     }
 
-    pub fn async_io_read<'a, F, T>(
+    pub fn io_read<'a, F, T>(
         &'a self,
         mut f: F,
     ) -> PollFn<impl FnMut(&mut Context) -> Poll<Result<T>> + use<'a, F, Io, T>>

@@ -24,7 +24,7 @@ impl TcpListener {
     }
 
     pub fn accept(&mut self) -> impl Future<Output = Result<TcpConnection>> + '_ {
-        self.0.async_io_read(|io| {
+        self.0.io_read(|io| {
             let (stream, addr) = io.accept()?;
             Ok(TcpConnection::new(addr, stream))
         })

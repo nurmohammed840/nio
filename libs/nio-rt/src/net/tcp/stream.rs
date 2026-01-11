@@ -7,7 +7,7 @@ use std::task::{Context, Poll};
 
 use super::split::{TcpReader, TcpWriter, split};
 
-pub struct TcpStream(AsyncIO<mio::net::TcpStream>);
+pub struct TcpStream(pub(crate) AsyncIO<mio::net::TcpStream>);
 
 impl TcpStream {
     pub fn new(io: mio::net::TcpStream) -> Result<TcpStream> {
@@ -48,8 +48,8 @@ impl TcpStream {
         self.0.io.peer_addr()
     }
 
-    pub fn peek<'b>(&self, buf: &'b mut [u8]) -> impl Future<Output = Result<usize>> + use<'_, 'b> {
-        self.0.async_io_read(|io| io.peek(buf))
+    pub fn peek<'b>(&mut self, buf: &'b mut [u8]) -> impl Future<Output = Result<usize>> + use<'_, 'b> {
+        self.0.io_read(|io| io.peek(buf))
     }
 
     pub fn nodelay(&self) -> Result<bool> {

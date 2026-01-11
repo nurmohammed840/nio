@@ -97,8 +97,8 @@ async fn tcp_writer_hangup() -> Result<()> {
 
 #[test]
 async fn udp_send_recv() -> Result<()> {
-    let socket1 = UdpSocket::bind("127.0.0.1:0").await?;
-    let socket2 = UdpSocket::bind("127.0.0.1:0").await?;
+    let mut socket1 = UdpSocket::bind("127.0.0.1:0").await?;
+    let mut socket2 = UdpSocket::bind("127.0.0.1:0").await?;
 
     socket1.connect(socket2.local_addr()?).await?;
 
