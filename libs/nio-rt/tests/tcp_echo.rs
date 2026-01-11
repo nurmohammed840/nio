@@ -8,10 +8,6 @@ use nio_rt::{
     spawn_local, test,
 };
 
-mod support {
-    pub mod futures;
-}
-
 #[test]
 async fn echo_server() -> Result<()> {
     const ITER: usize = 1024;

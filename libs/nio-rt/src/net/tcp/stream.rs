@@ -12,7 +12,7 @@ use super::split::{TcpReader, TcpWriter, split};
 pub struct TcpStream(pub(crate) AsyncIO<mio::net::TcpStream>);
 
 impl TcpStream {
-    pub fn new(io: mio::net::TcpStream) -> Result<TcpStream> {
+    pub(crate) fn new(io: mio::net::TcpStream) -> Result<TcpStream> {
         Ok(Self(AsyncIO::new(io)?))
     }
 
@@ -124,6 +124,14 @@ impl TcpStream {
             .io_write(|mut io| Write::write_vectored(&mut io, bufs));
 
         Pin::new(&mut poll_fn).poll(cx)
+    }
+}
+
+impl TryFrom<std::net::TcpStream> for TcpStream {
+    type Error = Error;
+    fn try_from(stream: std::net::TcpStream) -> Result<Self> {
+        stream.set_nonblocking(true)?;
+        TcpStream::new(mio::net::TcpStream::from_std(stream))
     }
 }
 

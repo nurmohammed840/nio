@@ -1,4 +1,3 @@
-#![warn(rust_2018_idioms)]
 #![cfg(not(miri))]
 
 use std::io::Result;
@@ -8,9 +7,6 @@ use nio_rt::{
     spawn_local, test,
 };
 
-mod support {
-    pub mod futures;
-}
 use futures::try_join;
 
 async fn accept(mut srv: TcpListener) -> Result<TcpStream> {

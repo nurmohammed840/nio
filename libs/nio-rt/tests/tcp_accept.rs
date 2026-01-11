@@ -1,4 +1,3 @@
-#![warn(rust_2018_idioms)]
 #![cfg(not(miri))]
 
 use futures::{Stream, StreamExt};
