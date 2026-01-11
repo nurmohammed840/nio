@@ -1,26 +1,26 @@
-use std::{fmt, future::poll_fn, num::NonZeroUsize, sync::Arc, task::Poll};
+use std::{fmt, future::poll_fn, num::NonZero, sync::Arc, task::Poll};
 
 use super::raw::RawTask;
 
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
-pub struct TaskId(pub(crate) NonZeroUsize);
+pub struct TaskId(pub(crate) NonZero<usize>);
 
 impl TaskId {
-    pub(super) fn new(task: &RawTask) -> Self {
-        Self(unsafe { NonZeroUsize::new_unchecked(Arc::as_ptr(task).cast::<()>() as usize) })
+    pub(super) fn new(task: &RawTask) -> TaskId {
+        TaskId(unsafe { NonZero::new_unchecked(Arc::as_ptr(task).addr()) })
     }
 
     #[inline]
-    pub fn get(&self) -> usize {
-        self.0.get()
+    pub fn get(&self) -> NonZero<usize> {
+        self.0
     }
 }
 
 pub fn id() -> impl Future<Output = TaskId> {
     poll_fn(|cx| {
-        let ptr = cx.waker().data();
-        let id = unsafe { NonZeroUsize::new_unchecked(ptr as usize) };
-        Poll::Ready(TaskId(id))
+        Poll::Ready(TaskId(unsafe {
+            NonZero::new_unchecked(cx.waker().data().addr())
+        }))
     })
 }
 
