@@ -1,7 +1,7 @@
 pub mod context;
+pub mod metrics;
 pub mod task;
 mod task_counter;
-pub mod metrics;
 mod worker;
 
 use crate::{RuntimeBuilder, driver};
@@ -64,6 +64,14 @@ impl Runtime {
         Fut::Output: Send + 'static,
     {
         nio_future::block_on(self.context.spawn_pinned_at(0, fut)).unwrap()
+    }
+}
+
+impl std::ops::Deref for Runtime {
+    type Target = Arc<RuntimeContext>;
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.context
     }
 }
 

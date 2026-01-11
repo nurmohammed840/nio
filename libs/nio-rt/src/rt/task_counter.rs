@@ -80,10 +80,12 @@ impl TaskCounter {
 
 impl fmt::Debug for Counter {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Counter")
-            .field("local", &self.local())
-            .field("shared", &self.shared())
-            .finish()
+        write!(
+            f,
+            "Counter {{ local: {}, shared: {} }}",
+            self.local(),
+            self.shared()
+        )
     }
 }
 

@@ -43,8 +43,9 @@ impl Notifier {
     }
 
     pub fn notify_once(&self) {
-        if self.state.swap(Notifier::NOTIFIED, Ordering::Acquire) == Notifier::RESET {
-            let _ = self.waker.wake();
+        if self.state.swap(Notifier::NOTIFIED, Ordering::AcqRel) == Notifier::RESET {
+            let _result = self.waker.wake();
+            debug_assert!(_result.is_ok(), "{_result:?}")
         }
     }
 
@@ -118,7 +119,6 @@ impl Workers {
     }
 
     pub fn job(context: Rc<LocalContext>, tick: u32, mut driver: Driver) {
-        debug_assert_ne!(tick, 0);
         context.clone().init();
 
         let notifier = context.notifier();
@@ -127,8 +127,6 @@ impl Workers {
         loop {
             for _ in 0..tick {
                 let Some(task) = (unsafe { context.local_queue(|q| q.pop_front()) }) else {
-                    // Local queue is empty; accept notification from other threads.
-                    notifier.accept_notify_once();
                     break;
                 };
                 match task.poll() {
@@ -142,20 +140,25 @@ impl Workers {
                 }
             }
 
-            let counter = task_counter.load();
-            let queue_is_not_empty = if counter.shared_queue_has_data() {
-                context.move_tasks_from_shared_to_local_queue(counter);
-                true
-            } else {
-                unsafe { context.local_queue(|q| !q.is_empty()) }
-            };
+            let mut local_queue_is_empty = unsafe { context.local_queue(|q| q.is_empty()) };
+            
+            if local_queue_is_empty {
+                // Accept notification from other threads.
+                notifier.accept_notify_once();
+            }
 
-            let (timers, timeout) = unsafe {
+            let counter = task_counter.load();
+            if counter.shared_queue_has_data() {
+                context.move_tasks_from_shared_to_local_queue(counter);
+                local_queue_is_empty = false
+            }
+
+            let (expired, timeout) = unsafe {
                 context.timers(|timer| {
                     let now = timer.clock.now();
-                    let elapsed = timer.fetch(now);
+                    let timers_expired = timer.fetch(now);
 
-                    let timeout = if queue_is_not_empty || elapsed.is_some() {
+                    let timeout = if !local_queue_is_empty || timers_expired.is_some() {
                         // Do not sleep; We have more work to do.
                         Some(Duration::ZERO)
                     } else {
@@ -163,11 +166,11 @@ impl Workers {
                         // or until woken by an I/O event or another thread send more task.
                         timer.next_timeout(now)
                     };
-                    (elapsed, timeout)
+                    (timers_expired, timeout)
                 })
             };
 
-            if let Some(timers) = timers {
+            if let Some(timers) = expired {
                 timers.notify_all();
             }
 
