@@ -23,7 +23,7 @@ impl TcpListener {
         future::ready(bind(addr, TcpListener::bind_addr))
     }
 
-    pub fn accept(&self) -> impl Future<Output = Result<TcpConnection>> + '_ {
+    pub fn accept(&mut self) -> impl Future<Output = Result<TcpConnection>> + '_ {
         self.0.async_io_read(|io| {
             let (stream, addr) = io.accept()?;
             Ok(TcpConnection::new(addr, stream))

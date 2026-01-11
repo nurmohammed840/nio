@@ -21,7 +21,7 @@ Aliquam consequat urna vitae ipsum pulvinar, in blandit purus eleifend.
 ";
 
 async fn tcp_streams() -> Result<(TcpStream, TcpStream)> {
-    let listener = TcpListener::bind("127.0.0.1:0").await?;
+    let mut listener = TcpListener::bind("127.0.0.1:0").await?;
     let addr = listener.local_addr()?;
 
     let server = spawn_local(async move {

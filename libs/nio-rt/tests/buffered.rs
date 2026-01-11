@@ -17,7 +17,7 @@ use support::futures::test::assert_ok;
 async fn echo_server() -> Result<()> {
     const N: usize = 1024;
 
-    let srv = TcpListener::bind("127.0.0.1:0").await?;
+    let mut srv = TcpListener::bind("127.0.0.1:0").await?;
     let addr = srv.local_addr()?;
 
     let msg = "foo bar baz";
