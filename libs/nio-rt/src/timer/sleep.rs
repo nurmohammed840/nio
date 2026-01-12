@@ -59,6 +59,9 @@ impl Future for Sleep {
 
 impl Drop for Sleep {
     fn drop(&mut self) {
+        if self.is_elapsed() {
+            return; // already droped
+        }
         LocalContext::with(|ctx| unsafe { ctx.timers(|timers| timers.remove(&self.timer)) })
     }
 }
