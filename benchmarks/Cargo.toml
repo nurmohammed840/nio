@@ -26,10 +26,10 @@ name = "timer"
 path = "timer.rs"
 harness = false
 
-# [[bench]]
-# name = "spawn"
-# path = "spawn.rs"
-# harness = false
+[[bench]]
+name = "spawn"
+path = "spawn.rs"
+harness = false
 
 # [[bench]]
 # name = "sync_broadcast"

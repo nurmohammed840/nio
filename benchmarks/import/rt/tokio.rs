@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use std::future::Future;
 pub use tokio::{
     task::spawn,

@@ -1,5 +1,8 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use std::time::{Duration, Instant};
+
+use import::rt::*;
+
 mod import {
     pub mod rt;
 
@@ -8,7 +11,6 @@ mod import {
     //     pub use tokio::*;
     // }
 }
-use import::rt::*;
 
 // a very quick async task, but might timeout
 async fn quick_job() -> usize {
