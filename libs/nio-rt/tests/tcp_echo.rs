@@ -3,7 +3,7 @@
 use std::io::Result;
 
 use futures::{AsyncReadExt, AsyncWriteExt};
-use nio_rt::{
+use nio::{
     net::{TcpListener, TcpStream},
     spawn_local, test,
 };

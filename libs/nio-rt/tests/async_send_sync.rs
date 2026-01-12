@@ -135,111 +135,111 @@ const _: fn() = || {
 cfg_not_wasi! {
     mod fs {
         use super::*;
-        assert_value!(nio_rt::fs::DirBuilder: Send & Sync & Unpin);
-        assert_value!(nio_rt::fs::DirEntry: Send & Sync & Unpin);
-        // assert_value!(nio_rt::fs::File: Send & Sync & Unpin);
-        // assert_value!(nio_rt::fs::OpenOptions: Send & Sync & Unpin);
-        assert_value!(nio_rt::fs::ReadDir: Send & Sync & Unpin);
+        assert_value!(nio::fs::DirBuilder: Send & Sync & Unpin);
+        assert_value!(nio::fs::DirEntry: Send & Sync & Unpin);
+        // assert_value!(nio::fs::File: Send & Sync & Unpin);
+        // assert_value!(nio::fs::OpenOptions: Send & Sync & Unpin);
+        assert_value!(nio::fs::ReadDir: Send & Sync & Unpin);
 
-        async_assert_fn!(nio_rt::fs::canonicalize(&str): Send & Sync & !Unpin);
-        async_assert_fn!(nio_rt::fs::copy(&str, &str): Send & Sync & !Unpin);
-        async_assert_fn!(nio_rt::fs::create_dir(&str): Send & Sync & !Unpin);
-        async_assert_fn!(nio_rt::fs::create_dir_all(&str): Send & Sync & !Unpin);
-        async_assert_fn!(nio_rt::fs::hard_link(&str, &str): Send & Sync & !Unpin);
-        async_assert_fn!(nio_rt::fs::metadata(&str): Send & Sync & !Unpin);
-        async_assert_fn!(nio_rt::fs::read(&str): Send & Sync & !Unpin);
-        async_assert_fn!(nio_rt::fs::read_dir(&str): Send & Sync & !Unpin);
-        async_assert_fn!(nio_rt::fs::read_link(&str): Send & Sync & !Unpin);
-        async_assert_fn!(nio_rt::fs::read_to_string(&str): Send & Sync & !Unpin);
-        async_assert_fn!(nio_rt::fs::remove_dir(&str): Send & Sync & !Unpin);
-        async_assert_fn!(nio_rt::fs::remove_dir_all(&str): Send & Sync & !Unpin);
-        async_assert_fn!(nio_rt::fs::remove_file(&str): Send & Sync & !Unpin);
-        async_assert_fn!(nio_rt::fs::rename(&str, &str): Send & Sync & !Unpin);
-        async_assert_fn!(nio_rt::fs::set_permissions(&str, std::fs::Permissions): Send & Sync & !Unpin);
-        async_assert_fn!(nio_rt::fs::symlink_metadata(&str): Send & Sync & !Unpin);
-        async_assert_fn!(nio_rt::fs::write(&str, Vec<u8>): Send & Sync & !Unpin);
-        async_assert_fn!(nio_rt::fs::ReadDir::next_entry(_): Send & Sync & !Unpin);
-        // async_assert_fn!(nio_rt::fs::OpenOptions::open(_, &str): Send & Sync & !Unpin);
-        async_assert_fn!(nio_rt::fs::DirBuilder::create(_, &str): Send & Sync & !Unpin);
-        async_assert_fn!(nio_rt::fs::DirEntry::metadata(_): Send & Sync & !Unpin);
-        async_assert_fn!(nio_rt::fs::DirEntry::file_type(_): Send & Sync & !Unpin);
-        // async_assert_fn!(nio_rt::fs::File::open(&str): Send & Sync & !Unpin);
-        // async_assert_fn!(nio_rt::fs::File::create(&str): Send & Sync & !Unpin);
-        // async_assert_fn!(nio_rt::fs::File::sync_all(_): Send & Sync & !Unpin);
-        // async_assert_fn!(nio_rt::fs::File::sync_data(_): Send & Sync & !Unpin);
-        // async_assert_fn!(nio_rt::fs::File::set_len(_, u64): Send & Sync & !Unpin);
-        // async_assert_fn!(nio_rt::fs::File::metadata(_): Send & Sync & !Unpin);
-        // async_assert_fn!(nio_rt::fs::File::try_clone(_): Send & Sync & !Unpin);
-        // async_assert_fn!(nio_rt::fs::File::into_std(_): Send & Sync & !Unpin);
+        async_assert_fn!(nio::fs::canonicalize(&str): Send & Sync & !Unpin);
+        async_assert_fn!(nio::fs::copy(&str, &str): Send & Sync & !Unpin);
+        async_assert_fn!(nio::fs::create_dir(&str): Send & Sync & !Unpin);
+        async_assert_fn!(nio::fs::create_dir_all(&str): Send & Sync & !Unpin);
+        async_assert_fn!(nio::fs::hard_link(&str, &str): Send & Sync & !Unpin);
+        async_assert_fn!(nio::fs::metadata(&str): Send & Sync & !Unpin);
+        async_assert_fn!(nio::fs::read(&str): Send & Sync & !Unpin);
+        async_assert_fn!(nio::fs::read_dir(&str): Send & Sync & !Unpin);
+        async_assert_fn!(nio::fs::read_link(&str): Send & Sync & !Unpin);
+        async_assert_fn!(nio::fs::read_to_string(&str): Send & Sync & !Unpin);
+        async_assert_fn!(nio::fs::remove_dir(&str): Send & Sync & !Unpin);
+        async_assert_fn!(nio::fs::remove_dir_all(&str): Send & Sync & !Unpin);
+        async_assert_fn!(nio::fs::remove_file(&str): Send & Sync & !Unpin);
+        async_assert_fn!(nio::fs::rename(&str, &str): Send & Sync & !Unpin);
+        async_assert_fn!(nio::fs::set_permissions(&str, std::fs::Permissions): Send & Sync & !Unpin);
+        async_assert_fn!(nio::fs::symlink_metadata(&str): Send & Sync & !Unpin);
+        async_assert_fn!(nio::fs::write(&str, Vec<u8>): Send & Sync & !Unpin);
+        async_assert_fn!(nio::fs::ReadDir::next_entry(_): Send & Sync & !Unpin);
+        // async_assert_fn!(nio::fs::OpenOptions::open(_, &str): Send & Sync & !Unpin);
+        async_assert_fn!(nio::fs::DirBuilder::create(_, &str): Send & Sync & !Unpin);
+        async_assert_fn!(nio::fs::DirEntry::metadata(_): Send & Sync & !Unpin);
+        async_assert_fn!(nio::fs::DirEntry::file_type(_): Send & Sync & !Unpin);
+        // async_assert_fn!(nio::fs::File::open(&str): Send & Sync & !Unpin);
+        // async_assert_fn!(nio::fs::File::create(&str): Send & Sync & !Unpin);
+        // async_assert_fn!(nio::fs::File::sync_all(_): Send & Sync & !Unpin);
+        // async_assert_fn!(nio::fs::File::sync_data(_): Send & Sync & !Unpin);
+        // async_assert_fn!(nio::fs::File::set_len(_, u64): Send & Sync & !Unpin);
+        // async_assert_fn!(nio::fs::File::metadata(_): Send & Sync & !Unpin);
+        // async_assert_fn!(nio::fs::File::try_clone(_): Send & Sync & !Unpin);
+        // async_assert_fn!(nio::fs::File::into_std(_): Send & Sync & !Unpin);
         // async_assert_fn!(
-        //     nio_rt::fs::File::set_permissions(_, std::fs::Permissions): Send & Sync & !Unpin
+        //     nio::fs::File::set_permissions(_, std::fs::Permissions): Send & Sync & !Unpin
         // );
     }
 }
 
 cfg_not_wasi! {
-    // assert_value!(nio_rt::net::TcpSocket: !Send & !Sync & Unpin);
-    async_assert_fn!(nio_rt::net::TcpListener::bind(SocketAddr): !Send & !Sync & Unpin);
-    async_assert_fn!(nio_rt::net::TcpStream::connect(SocketAddr): !Send & !Sync & !Unpin);
+    // assert_value!(nio::net::TcpSocket: !Send & !Sync & Unpin);
+    async_assert_fn!(nio::net::TcpListener::bind(SocketAddr): !Send & !Sync & Unpin);
+    async_assert_fn!(nio::net::TcpStream::connect(SocketAddr): !Send & !Sync & !Unpin);
 }
 
-assert_value!(nio_rt::net::TcpListener: !Send & !Sync & Unpin);
-assert_value!(nio_rt::net::TcpStream: !Send & !Sync & Unpin);
-assert_value!(nio_rt::net::TcpReader: !Send & !Sync & Unpin);
-assert_value!(nio_rt::net::TcpWriter: !Send & !Sync & Unpin);
-// assert_value!(nio_rt::net::tcp::ReadHalf<'_>: Send & Sync & Unpin);
-// assert_value!(nio_rt::net::tcp::WriteHalf<'_>: Send & Sync & Unpin);
-// assert_value!(nio_rt::net::tcp::ReuniteError: Send & Sync & Unpin);
-async_assert_fn!(nio_rt::net::TcpListener::accept(_): !Send & !Sync & Unpin);
-async_assert_fn!(nio_rt::net::TcpStream::peek(_, &mut [u8]): !Send & !Sync & Unpin);
-// async_assert_fn!(nio_rt::net::TcpStream::readable(_): Send & Sync & !Unpin);
-// async_assert_fn!(nio_rt::net::TcpStream::ready(_, nio_rt::io::Interest): Send & Sync & !Unpin);
-// async_assert_fn!(nio_rt::net::TcpStream::writable(_): Send & Sync & !Unpin);
+assert_value!(nio::net::TcpListener: !Send & !Sync & Unpin);
+assert_value!(nio::net::TcpStream: !Send & !Sync & Unpin);
+assert_value!(nio::net::TcpReader: !Send & !Sync & Unpin);
+assert_value!(nio::net::TcpWriter: !Send & !Sync & Unpin);
+// assert_value!(nio::net::tcp::ReadHalf<'_>: Send & Sync & Unpin);
+// assert_value!(nio::net::tcp::WriteHalf<'_>: Send & Sync & Unpin);
+// assert_value!(nio::net::tcp::ReuniteError: Send & Sync & Unpin);
+async_assert_fn!(nio::net::TcpListener::accept(_): !Send & !Sync & Unpin);
+async_assert_fn!(nio::net::TcpStream::peek(_, &mut [u8]): !Send & !Sync & Unpin);
+// async_assert_fn!(nio::net::TcpStream::readable(_): Send & Sync & !Unpin);
+// async_assert_fn!(nio::net::TcpStream::ready(_, nio::io::Interest): Send & Sync & !Unpin);
+// async_assert_fn!(nio::net::TcpStream::writable(_): Send & Sync & !Unpin);
 
 // Wasi does not support UDP
 cfg_not_wasi! {
     mod udp_socket {
         use super::*;
-        assert_value!(nio_rt::net::UdpSocket: !Send & !Sync & Unpin);
-        async_assert_fn!(nio_rt::net::UdpSocket::bind(SocketAddr): !Send & !Sync & Unpin);
-        async_assert_fn!(nio_rt::net::UdpSocket::connect(_, SocketAddr): Send & Sync & Unpin);
-        async_assert_fn!(nio_rt::net::UdpSocket::peek_from(_, &mut [u8]): !Send & !Sync & Unpin);
-        // async_assert_fn!(nio_rt::net::UdpSocket::readable(_): Send & Sync & !Unpin);
-        // async_assert_fn!(nio_rt::net::UdpSocket::ready(_, nio_rt::io::Interest): Send & Sync & !Unpin);
-        async_assert_fn!(nio_rt::net::UdpSocket::recv(_, &mut [u8]): !Send & !Sync & Unpin);
-        async_assert_fn!(nio_rt::net::UdpSocket::recv_from(_, &mut [u8]): !Send & !Sync & Unpin);
-        async_assert_fn!(nio_rt::net::UdpSocket::send(_, &[u8]): !Send & !Sync & Unpin);
-        async_assert_fn!(nio_rt::net::UdpSocket::send_to(_, &[u8], SocketAddr): !Send & !Sync & Unpin);
-        // async_assert_fn!(nio_rt::net::UdpSocket::writable(_): Send & Sync & !Unpin);
+        assert_value!(nio::net::UdpSocket: !Send & !Sync & Unpin);
+        async_assert_fn!(nio::net::UdpSocket::bind(SocketAddr): !Send & !Sync & Unpin);
+        async_assert_fn!(nio::net::UdpSocket::connect(_, SocketAddr): Send & Sync & Unpin);
+        async_assert_fn!(nio::net::UdpSocket::peek_from(_, &mut [u8]): !Send & !Sync & Unpin);
+        // async_assert_fn!(nio::net::UdpSocket::readable(_): Send & Sync & !Unpin);
+        // async_assert_fn!(nio::net::UdpSocket::ready(_, nio::io::Interest): Send & Sync & !Unpin);
+        async_assert_fn!(nio::net::UdpSocket::recv(_, &mut [u8]): !Send & !Sync & Unpin);
+        async_assert_fn!(nio::net::UdpSocket::recv_from(_, &mut [u8]): !Send & !Sync & Unpin);
+        async_assert_fn!(nio::net::UdpSocket::send(_, &[u8]): !Send & !Sync & Unpin);
+        async_assert_fn!(nio::net::UdpSocket::send_to(_, &[u8], SocketAddr): !Send & !Sync & Unpin);
+        // async_assert_fn!(nio::net::UdpSocket::writable(_): Send & Sync & !Unpin);
     }
 }
 // async_assert_fn!(tokio::net::lookup_host(SocketAddr): Send & Sync & !Unpin);
-async_assert_fn!(nio_rt::net::TcpReader::peek(_, &mut [u8]): !Send & !Sync & Unpin);
+async_assert_fn!(nio::net::TcpReader::peek(_, &mut [u8]): !Send & !Sync & Unpin);
 
-assert_value!(nio_rt::JoinHandle<NN>: !Send & !Sync & Unpin);
-assert_value!(nio_rt::JoinHandle<YN>: Send & Sync & Unpin);
-assert_value!(nio_rt::JoinHandle<YY>: Send & Sync & Unpin);
+assert_value!(nio::JoinHandle<NN>: !Send & !Sync & Unpin);
+assert_value!(nio::JoinHandle<YN>: Send & Sync & Unpin);
+assert_value!(nio::JoinHandle<YY>: Send & Sync & Unpin);
 
-assert_value!(nio_rt::RuntimeBuilder: Send & Sync & Unpin);
-assert_value!(nio_rt::RuntimeContext: Send & Sync & Unpin);
-assert_value!(nio_rt::Runtime: Send & Sync & Unpin);
+assert_value!(nio::RuntimeBuilder: Send & Sync & Unpin);
+assert_value!(nio::RuntimeContext: Send & Sync & Unpin);
+assert_value!(nio::Runtime: Send & Sync & Unpin);
 
-assert_value!(nio_rt::Interval: !Send & !Sync & Unpin);
-assert_value!(nio_rt::Sleep: !Send & !Sync & Unpin);
-assert_value!(nio_rt::Timeout<BoxFutureSync<()>>: !Send & !Sync & Unpin);
-assert_value!(nio_rt::Timeout<BoxFutureSend<()>>: !Send & !Sync & Unpin);
-assert_value!(nio_rt::Timeout<BoxFuture<()>>: !Send & !Sync & Unpin);
-async_assert_fn!(nio_rt::sleep(Duration): !Send & !Sync & Unpin);
-async_assert_fn!(nio_rt::Sleep::at(Instant): !Send & !Sync & Unpin);
-async_assert_fn!(nio_rt::timeout(Duration, BoxFutureSync<()>): !Send & !Sync & Unpin);
-async_assert_fn!(nio_rt::timeout(Duration, BoxFutureSend<()>): !Send & !Sync & Unpin);
-async_assert_fn!(nio_rt::timeout(Duration, BoxFuture<()>): !Send & !Sync & Unpin);
-async_assert_fn!(nio_rt::Timeout::at(Instant, BoxFutureSync<()>): !Send & !Sync & Unpin);
-async_assert_fn!(nio_rt::Timeout::at(Instant, BoxFutureSend<()>): !Send & !Sync & Unpin);
-async_assert_fn!(nio_rt::Timeout::at(Instant, BoxFuture<()>): !Send & !Sync & Unpin);
-async_assert_fn!(nio_rt::Interval::tick(_): !Send & !Sync & Unpin);
+assert_value!(nio::Interval: !Send & !Sync & Unpin);
+assert_value!(nio::Sleep: !Send & !Sync & Unpin);
+assert_value!(nio::Timeout<BoxFutureSync<()>>: !Send & !Sync & Unpin);
+assert_value!(nio::Timeout<BoxFutureSend<()>>: !Send & !Sync & Unpin);
+assert_value!(nio::Timeout<BoxFuture<()>>: !Send & !Sync & Unpin);
+async_assert_fn!(nio::sleep(Duration): !Send & !Sync & Unpin);
+async_assert_fn!(nio::Sleep::at(Instant): !Send & !Sync & Unpin);
+async_assert_fn!(nio::timeout(Duration, BoxFutureSync<()>): !Send & !Sync & Unpin);
+async_assert_fn!(nio::timeout(Duration, BoxFutureSend<()>): !Send & !Sync & Unpin);
+async_assert_fn!(nio::timeout(Duration, BoxFuture<()>): !Send & !Sync & Unpin);
+async_assert_fn!(nio::Timeout::at(Instant, BoxFutureSync<()>): !Send & !Sync & Unpin);
+async_assert_fn!(nio::Timeout::at(Instant, BoxFutureSend<()>): !Send & !Sync & Unpin);
+async_assert_fn!(nio::Timeout::at(Instant, BoxFuture<()>): !Send & !Sync & Unpin);
+async_assert_fn!(nio::Interval::tick(_): !Send & !Sync & Unpin);
 
-assert_value!(nio_rt::LocalContext: !Send & !Sync & Unpin);
+assert_value!(nio::LocalContext: !Send & !Sync & Unpin);
 
 // #[cfg(unix)]
 // mod unix_datagram {

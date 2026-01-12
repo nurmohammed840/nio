@@ -1,12 +1,12 @@
 use nio_future::yield_now;
-use nio_rt::{TaskId, spawn, spawn_local, test};
+use nio::{TaskId, spawn, spawn_local, test};
 
 async fn task_id() -> TaskId {
-    let id = async { nio_rt::task_id().await };
+    let id = async { nio::task_id().await };
     yield_now().await;
     let id = id.await;
     yield_now().await;
-    assert_eq!(id, nio_rt::task_id().await);
+    assert_eq!(id, nio::task_id().await);
     id
 }
 

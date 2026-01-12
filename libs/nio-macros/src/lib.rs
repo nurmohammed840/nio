@@ -27,6 +27,6 @@ pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
 fn crate_path() -> quote2::proc_macro2::TokenStream {
     use quote2::*;
     let mut out = proc_macro2::TokenStream::new();
-    quote!(out, { ::nio_rt });
+    quote!(out, { ::nio });
     out
 }

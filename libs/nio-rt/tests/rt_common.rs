@@ -1,9 +1,12 @@
 #![allow(clippy::needless_range_loop)]
 #![warn(rust_2018_idioms)]
 
+use nio::{
+    Runtime, RuntimeBuilder, Sleep,
+    net::{TcpListener, TcpStream},
+    sleep, spawn, spawn_blocking, spawn_local,
+};
 use nio_future::{block_on, yield_now};
-use nio_rt::net::{TcpListener, TcpStream};
-use nio_rt::{Runtime, RuntimeBuilder, Sleep, sleep, spawn, spawn_blocking, spawn_local};
 
 use std::time::Duration;
 use std::{thread, time::Instant};

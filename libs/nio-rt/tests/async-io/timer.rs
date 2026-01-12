@@ -5,7 +5,7 @@ use std::{
 };
 
 use futures_lite::FutureExt;
-use nio_rt::{Sleep, sleep, spawn_local, test, timeout};
+use nio::{Sleep, sleep, spawn_local, test, timeout};
 
 #[test]
 async fn smoke() {
@@ -19,7 +19,7 @@ async fn interval() {
     let period = Duration::from_secs(1);
     let jitter = Duration::from_millis(500);
     let start = Instant::now();
-    let mut timer = nio_rt::Interval::at(start + period, period);
+    let mut timer = nio::Interval::at(start + period, period);
 
     timer.tick().await;
 

@@ -1,5 +1,5 @@
 use nio_future::yield_now;
-use nio_rt::{RuntimeBuilder, spawn, spawn_local, test};
+use nio::{RuntimeBuilder, spawn, spawn_local, test};
 
 mod support {
     pub mod futures;

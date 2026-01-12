@@ -1,6 +1,6 @@
 use std::{sync::Arc, thread, time::Duration};
 
-use nio_rt::{sleep, spawn, spawn_local, test};
+use nio::{sleep, spawn, spawn_local, test};
 
 #[test]
 async fn test_abort_without_panic_3157() {

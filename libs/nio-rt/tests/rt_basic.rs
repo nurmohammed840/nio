@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 
+use nio::{Runtime, RuntimeBuilder, spawn, spawn_local};
 use nio_future::yield_now;
-use nio_rt::{spawn, spawn_local};
 
 use std::thread;
 use std::time::Duration;
@@ -130,11 +130,8 @@ fn spawn_remote() {
     assert_eq!(out, "ZOMG");
 }
 
-fn rt(core: u8) -> nio_rt::Runtime {
-    nio_rt::RuntimeBuilder::new()
-        .worker_threads(core)
-        .rt()
-        .unwrap()
+fn rt(core: u8) -> Runtime {
+    RuntimeBuilder::new().worker_threads(core).rt().unwrap()
 }
 
 // If the cycle causes a leak, then miri will catch it.

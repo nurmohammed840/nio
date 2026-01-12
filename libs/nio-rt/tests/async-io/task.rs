@@ -1,4 +1,4 @@
-use nio_rt::{spawn_local, test};
+use nio::{spawn_local, test};
 use std::{
     future::{Future, poll_fn},
     pin::Pin,

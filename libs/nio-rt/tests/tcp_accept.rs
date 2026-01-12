@@ -2,7 +2,7 @@
 
 use futures::{Stream, StreamExt};
 use nio_future::yield_now;
-use nio_rt::{
+use nio::{
     net::{TcpListener, TcpStream},
     spawn_local, test,
 };

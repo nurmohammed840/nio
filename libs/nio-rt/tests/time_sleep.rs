@@ -1,4 +1,4 @@
-use nio_rt::{Sleep, test};
+use nio::{Sleep, test};
 use std::time::{Duration, Instant};
 
 mod support {
@@ -53,7 +53,7 @@ async fn reset_past_sleep_before_fire() {
 
     let mut sleep = sleep.into_inner();
 
-    nio_rt::sleep(ms(20)).await;
+    nio::sleep(ms(20)).await;
 
     sleep.reset_at(now + ms(80));
     sleep.await;

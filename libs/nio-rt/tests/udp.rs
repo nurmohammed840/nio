@@ -1,6 +1,6 @@
 #![cfg(not(miri))]
 
-use nio_rt::{net::UdpSocket, test};
+use nio::{net::UdpSocket, test};
 use std::{future::poll_fn, io::Result, pin::Pin};
 
 const MSG: &[u8] = b"hello";

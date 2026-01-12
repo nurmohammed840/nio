@@ -2,7 +2,7 @@
 #![cfg(not(target_os = "wasi"))] // Wasi does not support bind()
 #![cfg(not(miri))]
 
-use nio_rt::{net::TcpListener, test};
+use nio::{net::TcpListener, test};
 
 use std::io::{Result, prelude::*};
 use std::net::TcpStream;

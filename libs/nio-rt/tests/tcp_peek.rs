@@ -4,7 +4,7 @@ use std::io::Result;
 use std::thread;
 use std::{io::Write, net};
 
-use nio_rt::{net::TcpStream, test};
+use nio::{net::TcpStream, test};
 
 #[test]
 async fn peek() -> Result<()> {

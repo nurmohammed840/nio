@@ -1,4 +1,4 @@
-use nio_rt::{Runtime, RuntimeBuilder, spawn};
+use nio::{Runtime, RuntimeBuilder, spawn};
 
 use std::sync::{
     Arc,

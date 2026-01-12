@@ -3,7 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use nio_rt::{Sleep, Timeout, spawn_local, spawn_pinned, test};
+use nio::{Sleep, Timeout, spawn_local, spawn_pinned, test};
 
 const ITER: usize = if cfg!(miri) { 20 } else { 500 };
 const DELAY: Duration = Duration::from_millis(10);

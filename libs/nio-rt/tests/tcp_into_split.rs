@@ -7,7 +7,7 @@ use std::{
 };
 
 use futures::try_join;
-use nio_rt::{
+use nio::{
     net::{TcpListener, TcpStream},
     sleep, spawn_local, test,
 };

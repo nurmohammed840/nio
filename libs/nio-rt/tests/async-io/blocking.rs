@@ -1,5 +1,5 @@
 use futures_lite::future;
-use nio_rt::{spawn_blocking, test};
+use nio::{spawn_blocking, test};
 use std::{
     io::Result,
     sync::mpsc,

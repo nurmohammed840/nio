@@ -2,7 +2,7 @@
 #![cfg(not(target_os = "wasi"))] // Wasi doesn't support panic recovery
 #![cfg(panic = "unwind")]
 
-use nio_rt::{sleep, spawn, test};
+use nio::{sleep, spawn, test};
 use std::time::Duration;
 
 struct PanicsOnDrop;

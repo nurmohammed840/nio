@@ -8,7 +8,7 @@ use std::{
 };
 
 use futures_lite::{AsyncReadExt, AsyncWriteExt, future};
-use nio_rt::{
+use nio::{
     net::{TcpListener, TcpReader, TcpStream, TcpWriter, UdpSocket},
     sleep, spawn_local, test,
 };

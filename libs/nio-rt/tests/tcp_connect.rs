@@ -2,7 +2,7 @@
 
 use std::io::Result;
 
-use nio_rt::{
+use nio::{
     net::{TcpListener, TcpStream},
     spawn_local, test,
 };
