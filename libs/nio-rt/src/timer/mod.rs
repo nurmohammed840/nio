@@ -129,7 +129,7 @@ impl Timers {
     }
 
     pub fn fetch(&mut self, upto: Instant) -> Option<Elapsed> {
-        let timer = &Timer::new(upto + Duration::from_millis(1));
+        let timer = &Timer::new(upto);
         let right = self.entries.split_off(&TimerEntry { timer });
         let left = mem::replace(&mut self.entries, right);
         if left.is_empty() {

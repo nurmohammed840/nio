@@ -11,13 +11,10 @@ use nio_rt::{Sleep, sleep, spawn_local, test, timeout};
 async fn smoke() {
     let start = Instant::now();
     Sleep::at(start + Duration::from_secs(1)).await;
-
-    let elapsed = start.elapsed();
-    assert!(elapsed >= Duration::from_secs(1));
+    assert!(start.elapsed() >= Duration::from_secs(1));
 }
 
 #[test]
-#[ignore]
 async fn interval() {
     let period = Duration::from_secs(1);
     let jitter = Duration::from_millis(500);
