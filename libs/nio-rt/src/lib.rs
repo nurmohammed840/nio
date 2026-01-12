@@ -9,7 +9,7 @@ mod utils;
 
 use std::{num::NonZeroUsize, time::Duration};
 
-pub use nio_macro::*;
+pub use nio_macros::*;
 pub use nio_task::{AbortHandle, JoinError, JoinHandle, TaskId};
 pub use nio_task::id as task_id;
 pub use rt::{
