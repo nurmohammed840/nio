@@ -66,7 +66,7 @@ if __name__ == "__main__":
     # Configuration
     NIO_URL = "http://127.0.0.1:4000"
     TOKIO_URL = "http://127.0.0.1:5000"
-    THREADS = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
+    THREADS = [2, 4, 6, 8, 10, 12, 14, 16]
     CONNECTIONS = [50, 100, 500, 1000]
 
     print("Running benchmarks for NIO server...")

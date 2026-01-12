@@ -33,18 +33,17 @@ mod nio_hyper_example {
     #[nio::main]
     pub async fn main() -> io::Result<()> {
         let mut listener = TcpListener::bind("127.0.0.1:4000").await?;
-        println!("listener: {:#?}", listener);
+        println!("Nio: {:#?}", listener);
         loop {
             let conn = listener.accept().await?;
             nio::spawn_pinned(|| async move {
                 let stream = conn.connect().await.unwrap();
                 let io = NioIo::new(stream);
-                if let Err(err) = http1::Builder::new()
-                    // `service_fn` converts our function in a `Service`
+                if let Err(_err) = http1::Builder::new()
                     .serve_connection(io, service_fn(hello))
                     .await
                 {
-                    eprintln!("Error serving connection: {err:?}");
+                    // eprintln!("Error serving connection: {_err:?}");
                 }
             });
         }
@@ -59,21 +58,21 @@ mod tokio_hyper_example {
 
     #[tokio::main]
     pub async fn main() -> io::Result<()> {
-        nio::spawn(run()).await?
+        tokio::spawn(run()).await?
     }
 
     pub async fn run() -> io::Result<()> {
         let listener = TcpListener::bind("127.0.0.1:5000").await?;
+        println!("Tokio: {:#?}", listener);
         loop {
             let (stream, _) = listener.accept().await?;
             tokio::spawn(async move {
                 let io = TokioIo::new(stream);
-                if let Err(err) = http1::Builder::new()
-                    // `service_fn` converts our function in a `Service`
+                if let Err(_err) = http1::Builder::new()
                     .serve_connection(io, service_fn(hello))
                     .await
                 {
-                    eprintln!("Error serving connection: {err:?}");
+                    // eprintln!("Error serving connection: {_err:?}");
                 }
             });
         }
