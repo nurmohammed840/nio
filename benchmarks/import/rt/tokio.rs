@@ -1,0 +1,42 @@
+use std::future::Future;
+pub use tokio::{
+    task::spawn,
+    time::{sleep, timeout},
+};
+
+pub struct Runtime(tokio::runtime::Runtime);
+
+impl Runtime {
+    pub fn new(workers: usize) -> Runtime {
+        let rt = if workers == 1 {
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap()
+        } else {
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .worker_threads(workers)
+                .build()
+                .unwrap()
+        };
+        Self(rt)
+    }
+
+    pub fn block_on<F>(&self, future: F) -> F::Output
+    where
+        F: Future + Send + 'static,
+        F::Output: Send + 'static,
+    {
+        self.0.block_on(future)
+    }
+}
+
+pub fn spawn_pinned<F, Fut>(future: F) -> tokio::task::JoinHandle<Fut::Output>
+where
+    F: FnOnce() -> Fut + Send,
+    Fut: Future + 'static + Send,
+    Fut::Output: Send + 'static,
+{
+    tokio::spawn(future())
+}
