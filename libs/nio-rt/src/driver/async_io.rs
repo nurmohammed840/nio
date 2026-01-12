@@ -12,6 +12,9 @@ pub struct AsyncIO<Io: Source> {
     waker: Box<IoWaker>,
 }
 
+impl<Io: Source> std::panic::UnwindSafe for AsyncIO<Io> {}
+impl<Io: Source> std::panic::RefUnwindSafe for AsyncIO<Io> {}
+
 impl<Io: Source> AsyncIO<Io> {
     pub fn new(io: Io) -> Result<Self> {
         Self::with_interest(io, Interest::READABLE | Interest::WRITABLE)
