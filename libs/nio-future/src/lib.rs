@@ -6,8 +6,7 @@ use std::{
     task::{Context, Poll, Wake, Waker},
 };
 
-pub async fn yield_now() {
-    /// Yield implementation
+pub fn yield_now() -> impl Future<Output = ()> {
     struct YieldNow {
         yielded: bool,
     }
@@ -22,7 +21,7 @@ pub async fn yield_now() {
             Poll::Pending
         }
     }
-    YieldNow { yielded: false }.await;
+    YieldNow { yielded: false }
 }
 
 pub fn block_on<Fut>(fut: Fut) -> Fut::Output
