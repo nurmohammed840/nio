@@ -1,4 +1,4 @@
-pub use nio::{sleep, spawn, timeout, spawn_pinned};
+pub use nio::{sleep, spawn, spawn_blocking, spawn_pinned, timeout};
 use std::future::Future;
 
 pub struct Runtime(nio::Runtime);
@@ -13,11 +13,20 @@ impl Runtime {
         )
     }
 
+    pub fn multi() -> Runtime {
+        Self(
+            nio::RuntimeBuilder::new()
+                .max_blocking_threads(512)
+                .rt()
+                .unwrap(),
+        )
+    }
+
     pub fn block_on<F>(&self, future: F) -> F::Output
     where
         F: Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        nio_future::block_on(self.0.spawn(future)).unwrap()
+        nio_future::block_on(self.0.spawn_pinned_at(0, || future)).unwrap()
     }
 }

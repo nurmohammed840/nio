@@ -2,7 +2,7 @@
 
 use std::future::Future;
 pub use tokio::{
-    task::spawn,
+    task::{spawn, spawn_blocking},
     time::{sleep, timeout},
 };
 
@@ -23,6 +23,16 @@ impl Runtime {
                 .unwrap()
         };
         Self(rt)
+    }
+
+    pub fn multi() -> Runtime {
+        Self(
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .max_blocking_threads(512)
+                .build()
+                .unwrap(),
+        )
     }
 
     pub fn block_on<F>(&self, future: F) -> F::Output
