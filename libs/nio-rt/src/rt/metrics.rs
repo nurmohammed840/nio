@@ -12,7 +12,7 @@ impl RuntimeMetrics {
         self.ctx.workers.task_counters.len()
     }
 
-    pub fn task_counters(&self) -> Vec<Counter> {
+    pub fn task_counts(&self) -> Vec<Counter> {
         let mut arr = Vec::with_capacity(self.num_workers());
         for task_counter in &self.ctx.workers.task_counters {
             arr.push(task_counter.load());
