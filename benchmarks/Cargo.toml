@@ -6,20 +6,15 @@ edition = "2021"
 license = "MIT"
 
 [features]
-test-util = ["tokio/test-util"]
 tokio = []
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 nio = { path = "../libs/nio-rt" }
 nio-future = { path = "../libs/nio-future" }
-criterion = "0.5.1"
-rand = "0.8"
-rand_chacha = "0.3"
+criterion = "0.7"
 
 [dev-dependencies]
-tokio-util = { version = "0.7.0", features = ["full"] }
-tokio-stream = { version = "0.1" }
 
 [[bench]]
 name = "timer"
