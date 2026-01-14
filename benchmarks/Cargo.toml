@@ -36,42 +36,7 @@ name = "rt_current_thread"
 path = "rt_current_thread.rs"
 harness = false
 
-# [[bench]]
-# name = "sync_mpsc_oneshot"
-# path = "sync_mpsc_oneshot.rs"
-# harness = false
-
-# [[bench]]
-# name = "sync_mpsc"
-# path = "sync_mpsc.rs"
-# harness = false
-
-# [[bench]]
-# name = "sync_notify"
-# path = "sync_notify.rs"
-# harness = false
-
-# [[bench]]
-# name = "sync_rwlock"
-# path = "sync_rwlock.rs"
-# harness = false
-
-# [[bench]]
-# name = "sync_semaphore"
-# path = "sync_semaphore.rs"
-# harness = false
-
-# [[bench]]
-# name = "sync_watch"
-# path = "sync_watch.rs"
-# harness = false
-
-# [[bench]]
-# name = "time_now"
-# path = "time_now.rs"
-# harness = false
-
-# [[bench]]
-# name = "time_timeout"
-# path = "time_timeout.rs"
-# harness = false
+[[bench]]
+name = "rt_multi_threaded"
+path = "rt_multi_threaded.rs"
+harness = false

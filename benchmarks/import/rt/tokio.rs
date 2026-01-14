@@ -6,7 +6,7 @@ pub use tokio::{
     time::{sleep, timeout},
 };
 
-pub struct Runtime(tokio::runtime::Runtime);
+pub struct Runtime(pub tokio::runtime::Runtime);
 
 impl Runtime {
     pub fn new(workers: usize) -> Runtime {
@@ -41,6 +41,10 @@ impl Runtime {
         F::Output: Send + 'static,
     {
         self.0.spawn(future)
+    }
+
+    pub fn handle(&self) -> &tokio::runtime::Handle {
+        self.0.handle()
     }
 
     pub fn block_on<F>(&self, future: F) -> F::Output

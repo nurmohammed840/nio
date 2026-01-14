@@ -45,7 +45,10 @@ impl Notifier {
     pub fn notify_once(&self) {
         if self.state.swap(Notifier::NOTIFIED, Ordering::AcqRel) == Notifier::RESET {
             let _result = self.waker.wake();
-            debug_assert!(_result.is_ok(), "{_result:?}")
+            #[cfg(debug_assertions)]
+            if let Err(err) = _result {
+                eprintln!("wake error: {err:#?}");
+            }
         }
     }
 
@@ -141,7 +144,7 @@ impl Workers {
             }
 
             let mut local_queue_is_empty = unsafe { context.local_queue(|q| q.is_empty()) };
-            
+
             if local_queue_is_empty {
                 // Accept notification from other threads.
                 notifier.accept_notify_once();

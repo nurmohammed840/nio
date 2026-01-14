@@ -1,7 +1,7 @@
-pub use nio::{sleep, spawn, spawn_blocking, spawn_pinned, timeout, spawn_local};
+pub use nio::{sleep, spawn, spawn_blocking, spawn_local, spawn_pinned, timeout};
 use std::{future::Future, sync::Arc};
 
-pub struct Runtime(nio::Runtime);
+pub struct Runtime(pub nio::Runtime);
 
 impl Runtime {
     pub fn new(core: usize) -> Runtime {
@@ -28,6 +28,10 @@ impl Runtime {
         F::Output: Send + 'static,
     {
         self.0.spawn(future)
+    }
+    
+    pub fn handle(&self) -> Arc<nio::RuntimeContext> {
+        self.0.context()
     }
 
     pub fn block_on<F>(&self, future: F) -> F::Output
