@@ -84,7 +84,7 @@ impl RuntimeContext {
 
     pub(crate) fn send_task_at(&self, id: WorkerId, task: Task) {
         self.workers.shared_queue(id).push(task);
-        self.workers.task_counter(id).increase_shared();
+        self.workers.task_queue(id).increase_shared();
         self.workers.notifier(id).notify_once();
     }
 }

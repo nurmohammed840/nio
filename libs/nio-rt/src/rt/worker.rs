@@ -1,4 +1,7 @@
-use crate::driver::{self, Driver};
+use crate::{
+    driver::{self, Driver},
+    utils::min_index_by_key,
+};
 
 use super::*;
 use std::{
@@ -12,7 +15,7 @@ use crossbeam_queue::SegQueue;
 
 use context::LocalContext;
 use task::{Status, Task};
-use task_counter::TaskCounter;
+use task_queue::TaskQueue;
 
 pub type SharedQueue = SegQueue<Task>;
 
@@ -60,15 +63,15 @@ impl Notifier {
 pub struct Workers {
     notifiers: Box<[Notifier]>,
     shared_queues: Box<[SharedQueue]>,
-    pub(crate) task_counters: Box<[TaskCounter]>,
+    pub(crate) task_queues: Box<[TaskQueue]>,
 }
 
 impl Workers {
     pub fn id(&self, id: u8) -> WorkerId {
-        if self.task_counters.get(id as usize).is_none() {
+        if self.task_queues.get(id as usize).is_none() {
             panic!(
                 "invalid worker id {id}:, (valid range: 0..{})",
-                self.task_counters.len()
+                self.task_queues.len()
             );
         }
         WorkerId(id)
@@ -77,10 +80,8 @@ impl Workers {
     pub fn least_loaded_worker(&self) -> WorkerId {
         unsafe {
             // Safety: `task_counters` is not empty
-            let id = crate::utils::min_index_by_key(&self.task_counters, |counter| {
-                counter.load().total()
-            });
-            debug_assert!(self.task_counters.get(id).is_some());
+            let id = min_index_by_key(&self.task_queues, |counter| counter.load().total());
+            debug_assert!(self.task_queues.get(id).is_some());
             WorkerId(id as u8)
         }
     }
@@ -90,8 +91,8 @@ impl Workers {
     }
 
     #[inline]
-    pub fn task_counter(&self, id: WorkerId) -> &TaskCounter {
-        unsafe { self.task_counters.get_unchecked(id.get()) }
+    pub fn task_queue(&self, id: WorkerId) -> &TaskQueue {
+        unsafe { self.task_queues.get_unchecked(id.get()) }
     }
 
     #[inline]
@@ -114,7 +115,7 @@ impl Workers {
         Ok((
             Self {
                 notifiers: notifier.into_boxed_slice(),
-                task_counters: (0..count).map(|_| TaskCounter::new()).collect(),
+                task_queues: (0..count).map(|_| TaskQueue::new()).collect(),
                 shared_queues: (0..count).map(|_| SegQueue::new()).collect(),
             },
             drivers.into_boxed_slice(),
@@ -125,7 +126,7 @@ impl Workers {
         context.clone().init();
 
         let notifier = context.notifier();
-        let task_counter = context.task_counter();
+        let task_queue = context.task_queue();
 
         loop {
             for _ in 0..tick {
@@ -137,7 +138,7 @@ impl Workers {
                         unsafe { context.local_queue(|q| q.push_back(task)) };
                     }
                     Status::Pending | Status::Complete(_) => {
-                        let counter = task_counter.decrease_local();
+                        let counter = task_queue.decrease_local();
                         context.move_tasks_from_shared_to_local_queue(counter);
                     }
                 }
@@ -150,7 +151,7 @@ impl Workers {
                 notifier.accept_notify_once();
             }
 
-            let counter = task_counter.load();
+            let counter = task_queue.load();
             if counter.shared_queue_has_data() {
                 context.move_tasks_from_shared_to_local_queue(counter);
                 local_queue_is_empty = false

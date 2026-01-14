@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::RuntimeContext;
-pub use crate::rt::task_counter::Counter;
+pub use crate::rt::task_queue::{Counter, TaskQueue};
 
 pub struct RuntimeMetrics {
     pub(crate) ctx: Arc<RuntimeContext>,
@@ -9,14 +9,10 @@ pub struct RuntimeMetrics {
 
 impl RuntimeMetrics {
     pub fn num_workers(&self) -> usize {
-        self.ctx.workers.task_counters.len()
+        self.ctx.workers.task_queues.len()
     }
 
-    pub fn task_counts(&self) -> Vec<Counter> {
-        let mut arr = Vec::with_capacity(self.num_workers());
-        for task_counter in &self.ctx.workers.task_counters {
-            arr.push(task_counter.load());
-        }
-        arr
+    pub fn task_counts(&self) -> impl Iterator<Item = Counter> {
+        self.ctx.workers.task_queues.iter().map(TaskQueue::load)
     }
 }

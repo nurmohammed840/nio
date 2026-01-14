@@ -20,6 +20,13 @@ fn rt_multi_spawn_many_local(c: &mut Criterion) {
     let rt = Runtime::new(NUM_WORKERS);
     let ctx = rt.handle();
 
+    let m = rt.0.context().metrics();
+    std::thread::spawn(move || loop {
+        std::thread::sleep(std::time::Duration::from_secs(3));
+        let count: Vec<_> = m.task_counts().collect();
+        println!("count: {:#?}", count);
+    });
+
     let (tx, rx) = mpsc::sync_channel(1000);
     static REM: AtomicUsize = AtomicUsize::new(0);
 

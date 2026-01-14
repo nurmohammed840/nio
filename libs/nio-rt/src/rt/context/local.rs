@@ -4,7 +4,7 @@ use super::*;
 use task::*;
 
 use std::{cell::UnsafeCell, collections::VecDeque, rc::Rc};
-use task_counter::{Counter, TaskCounter};
+use task_queue::{Counter, TaskQueue};
 use worker::{SharedQueue, WorkerId};
 
 pub struct LocalContext {
@@ -64,7 +64,7 @@ impl LocalContext {
 
     pub(crate) fn add_task_to_local_queue(&self, task: Task) {
         unsafe { self.local_queue(|q| q.push_back(task)) };
-        let counter = self.task_counter().increase_local();
+        let counter = self.task_queue().increase_local();
         self.move_tasks_from_shared_to_local_queue(counter)
     }
 
@@ -128,13 +128,13 @@ impl LocalContext {
                 let task = shared_queue.pop().unwrap();
                 unsafe { self.local_queue(|q| q.push_back(task)) };
             }
-            self.task_counter().move_shared_to_local(counter);
+            self.task_queue().move_shared_to_local(counter);
         }
     }
 
     #[inline]
-    pub(crate) fn task_counter(&self) -> &TaskCounter {
-        self.runtime_ctx.workers.task_counter(self.worker_id)
+    pub(crate) fn task_queue(&self) -> &TaskQueue {
+        self.runtime_ctx.workers.task_queue(self.worker_id)
     }
 
     pub(crate) fn notifier(&self) -> &worker::Notifier {

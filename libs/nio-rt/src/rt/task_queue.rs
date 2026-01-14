@@ -26,11 +26,12 @@ const NOTIFIED_FLAG: u64 = 1 << SHARED_COUNTER_BIT_SIZE;
 
 const LOCAL_COUNTER_ONE: u64 = 1 << LOCAL_COUNTER_BIT_SIZE;
 
-pub struct TaskCounter {
+pub struct TaskQueue {
     counter: AtomicU64,
 }
 
 #[derive(Clone, Copy)]
+#[must_use]
 pub struct Counter(u64);
 
 impl Counter {
@@ -60,7 +61,7 @@ impl Counter {
     }
 }
 
-impl TaskCounter {
+impl TaskQueue {
     pub fn new() -> Self {
         Self {
             counter: AtomicU64::new(0),
@@ -105,9 +106,8 @@ impl TaskCounter {
     }
 
     /// Only this function is allowed to call from other thread.
-    pub fn increase_shared(&self) {
-        self.counter
-            .fetch_add(SHARED_COUNTER_ONE, Ordering::Release);
+    pub fn increase_shared(&self) -> Counter {
+        Counter(self.counter.fetch_add(SHARED_COUNTER_ONE, Ordering::AcqRel))
     }
 
     /// Remove `N` from SHARED_COUNTER
@@ -132,20 +132,22 @@ impl fmt::Debug for Counter {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Counter {{ local: {}, shared: {} }}",
+            "Counter {{ local: {}, shared: {}, notified: {} }}",
             self.local(),
-            self.shared()
+            self.shared(),
+            self.is_notified()
         )
     }
 }
 
 #[cfg(test)]
 mod tests {
+    #![allow(unused)]
     use super::*;
 
     #[test]
     fn test_local_counter() {
-        let counter = TaskCounter::new();
+        let counter = TaskQueue::new();
         counter.increase_local();
         counter.decrease_local();
         assert_eq!(counter.load().total(), 0);
@@ -153,7 +155,7 @@ mod tests {
 
     #[test]
     fn test_shared_counter() {
-        let counter = TaskCounter::new();
+        let counter = TaskQueue::new();
         assert_eq!(counter.increase_local().shared(), 0);
         counter.increase_shared();
         assert_eq!(counter.increase_local().shared(), 1);
@@ -163,7 +165,7 @@ mod tests {
 
     #[test]
     fn test_move_counter() {
-        let counter = TaskCounter::new();
+        let counter = TaskQueue::new();
         counter.increase_local();
         counter.move_shared_to_local(counter.load());
         assert_eq!(counter.load().total(), 1);
@@ -178,7 +180,7 @@ mod tests {
 
     #[test]
     fn test_notification_flag() {
-        let counter = TaskCounter::new();
+        let counter = TaskQueue::new();
 
         assert_eq!(counter.load().is_notified(), false);
         counter.mark_as_notified();

@@ -1,7 +1,7 @@
 pub mod context;
 pub mod metrics;
 pub mod task;
-mod task_counter;
+mod task_queue;
 mod worker;
 
 use crate::{RuntimeBuilder, driver};
