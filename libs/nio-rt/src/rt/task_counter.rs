@@ -3,11 +3,28 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 
-const SHARED_COUNTER_BIT_SIZE: u8 = 32;
-const SHARED_COUNTER_MASK: u64 = (1 << SHARED_COUNTER_BIT_SIZE) - 1;
-const SHARED_COUNTER: u64 = 1;
+/// ## Bit layout
+///
+/// ```md
+/// 63                           33     31                    0
+/// ┌─────────────────────────────┬─────┬─────────────────────┐
+/// │        LOCAL_COUNTER        │  N  │    SHARED_COUNTER   │
+/// └─────────────────────────────┴─────┴─────────────────────┘
+///
+/// SHARED_COUNTER → bits 0..=31
+/// NOTIFIED_FLAG  → bit  32
+/// LOCAL_COUNTER  → bits 33..=63
+/// ```
+const LOCAL_COUNTER_BIT_SIZE: u8 = 32;
 
-const LOCAL_COUNTER: u64 = 1 << SHARED_COUNTER_BIT_SIZE;
+const SHARED_COUNTER_BIT_SIZE: u8 = LOCAL_COUNTER_BIT_SIZE - 1;
+const SHARED_COUNTER_MASK: u64 = (1 << SHARED_COUNTER_BIT_SIZE) - 1;
+const SHARED_COUNTER_ONE: u64 = 1;
+
+/// One bit is for `NOTIFIED_FLAG`
+const NOTIFIED_FLAG: u64 = 1 << SHARED_COUNTER_BIT_SIZE;
+
+const LOCAL_COUNTER_ONE: u64 = 1 << LOCAL_COUNTER_BIT_SIZE;
 
 pub struct TaskCounter {
     counter: AtomicU64,
@@ -19,7 +36,7 @@ pub struct Counter(u64);
 impl Counter {
     #[inline]
     pub fn local(self) -> u64 {
-        self.0 >> SHARED_COUNTER_BIT_SIZE
+        self.0 >> LOCAL_COUNTER_BIT_SIZE
     }
 
     #[inline]
@@ -36,6 +53,11 @@ impl Counter {
     pub fn total(self) -> u64 {
         self.local() + self.shared()
     }
+
+    #[inline]
+    pub(crate) fn is_notified(self) -> bool {
+        (self.0 & NOTIFIED_FLAG) == NOTIFIED_FLAG
+    }
 }
 
 impl TaskCounter {
@@ -45,19 +67,47 @@ impl TaskCounter {
         }
     }
 
+    pub fn mark_as_notified(&self) {
+        self.counter.fetch_or(NOTIFIED_FLAG, Ordering::Release);
+    }
+
+    /// clear `NOTIFIED_FLAG`
+    pub fn accept_notify_once_if_shared_queue_is_empty(&self) -> Counter {
+        let result = self
+            .counter
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |curr| {
+                let curr = Counter(curr);
+                // shared queue not empty → do nothing
+                if curr.shared() != 0 {
+                    return None;
+                }
+                // `NOTIFIED_FLAG` is not set
+                if !curr.is_notified() {
+                    return None;
+                }
+                // clear `NOTIFIED_FLAG`
+                Some(curr.0 & !NOTIFIED_FLAG)
+            });
+
+        match result {
+            Ok(state) | Err(state) => Counter(state),
+        }
+    }
+
     pub fn increase_local(&self) -> Counter {
-        Counter(self.counter.fetch_add(LOCAL_COUNTER, Ordering::AcqRel))
+        Counter(self.counter.fetch_add(LOCAL_COUNTER_ONE, Ordering::AcqRel))
     }
 
     pub fn decrease_local(&self) -> Counter {
-        let old = Counter(self.counter.fetch_sub(LOCAL_COUNTER, Ordering::AcqRel));
+        let old = Counter(self.counter.fetch_sub(LOCAL_COUNTER_ONE, Ordering::AcqRel));
         debug_assert!(old.local() > 0);
         old
     }
 
     /// Only this function is allowed to call from other thread.
     pub fn increase_shared(&self) {
-        self.counter.fetch_add(SHARED_COUNTER, Ordering::Release);
+        self.counter
+            .fetch_add(SHARED_COUNTER_ONE, Ordering::Release);
     }
 
     /// Remove `N` from SHARED_COUNTER
@@ -67,7 +117,7 @@ impl TaskCounter {
     pub fn move_shared_to_local(&self, n: Counter) {
         let shared = n.shared();
         self.counter.fetch_add(
-            (shared << SHARED_COUNTER_BIT_SIZE) - shared,
+            (shared << LOCAL_COUNTER_BIT_SIZE) - shared,
             Ordering::Release,
         );
     }
@@ -119,9 +169,52 @@ mod tests {
         assert_eq!(counter.load().total(), 1);
 
         counter.increase_shared();
-        counter.move_shared_to_local(counter.increase_local());
+        let count = counter.increase_local();
+        counter.move_shared_to_local(count);
 
         assert_eq!(counter.load().shared(), 0);
         assert_eq!(counter.load().local(), 3);
+    }
+
+    #[test]
+    fn test_notification_flag() {
+        let counter = TaskCounter::new();
+
+        assert_eq!(counter.load().is_notified(), false);
+        counter.mark_as_notified();
+        assert_eq!(counter.load().is_notified(), true);
+
+        counter.increase_local();
+        assert_eq!(counter.load().local(), 1);
+        assert_eq!(counter.load().is_notified(), true); // flag unaffected
+
+        counter.increase_shared();
+        assert_eq!(counter.load().shared(), 1);
+        assert_eq!(counter.load().is_notified(), true); // flag unaffected
+
+        // Attempt to clear NOTIFIED_FLAG while shared is not empty
+        counter.accept_notify_once_if_shared_queue_is_empty();
+        assert_eq!(counter.load().is_notified(), true); // flag unaffected
+
+        // clear shared counter
+        counter.move_shared_to_local(counter.load());
+        assert_eq!(counter.load().local(), 2);
+        assert_eq!(counter.load().shared(), 0);
+        assert_eq!(counter.load().is_notified(), true);
+
+        // Now shared is empty, clearing `NOTIFIED_FLAG` should succeed.
+        counter.accept_notify_once_if_shared_queue_is_empty();
+        assert_eq!(counter.load().is_notified(), false);
+
+        // Mark as notified again
+        counter.mark_as_notified();
+        assert_eq!(counter.load().is_notified(), true);
+
+        // Increase local and shared counters
+        counter.increase_local();
+        counter.increase_shared();
+        assert_eq!(counter.load().local(), 3);
+        assert_eq!(counter.load().shared(), 1);
+        assert_eq!(counter.load().is_notified(), true);
     }
 }
