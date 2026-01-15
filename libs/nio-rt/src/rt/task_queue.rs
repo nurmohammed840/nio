@@ -148,95 +148,98 @@ impl fmt::Debug for Counter {
 
 #[cfg(test)]
 mod tests {
-    #![allow(unused)]
     use super::*;
 
     impl TaskQueue {
         /// Only this function is allowed to call from other thread.
         pub fn increase_shared(&self) -> Counter {
-            Counter(self.counter.fetch_add(SHARED_COUNTER_ONE, Ordering::AcqRel))
-        }
-
-        pub fn mark_as_notified(&self) {
-            self.counter.fetch_or(NOTIFIED_FLAG, Ordering::Release);
+            self.increase_shared_and_mark_as_notified()
         }
     }
 
     #[test]
     fn test_local_counter() {
-        let counter = TaskQueue::new();
-        counter.increase_local();
-        counter.decrease_local();
-        assert_eq!(counter.load().total(), 0);
+        let q = TaskQueue::new();
+        assert_eq!(q.increase_local().total(), 0);
+        assert_eq!(q.decrease_local().local(), 1);
+        assert_eq!(q.load().total(), 0);
     }
 
     #[test]
     fn test_shared_counter() {
-        let counter = TaskQueue::new();
-        assert_eq!(counter.increase_local().shared(), 0);
-        counter.increase_shared();
-        assert_eq!(counter.increase_local().shared(), 1);
-        assert_eq!(counter.decrease_local().shared(), 1);
-        assert_eq!(counter.load().total(), 2);
+        let q = TaskQueue::new();
+        assert_eq!(q.increase_local().shared(), 0);
+        assert_eq!(q.increase_shared().local(), 1);
+        assert_eq!(q.increase_local().total(), 2);
+        assert_eq!(q.decrease_local().shared(), 1);
+        assert_eq!(q.load().total(), 2);
     }
 
     #[test]
     fn test_move_counter() {
-        let counter = TaskQueue::new();
-        counter.increase_local();
-        counter.move_shared_to_local(counter.load());
-        assert_eq!(counter.load().total(), 1);
+        let q = TaskQueue::new();
+        assert_eq!(q.increase_local().total(), 0);
+        q.move_shared_to_local(q.load());
+        assert_eq!(q.load().total(), 1);
 
-        counter.increase_shared();
-        let count = counter.increase_local();
-        counter.move_shared_to_local(count);
+        assert_eq!(q.increase_shared().local(), 1);
+        let old = q.increase_local();
+        q.move_shared_to_local(old);
 
-        assert_eq!(counter.load().shared(), 0);
-        assert_eq!(counter.load().local(), 3);
+        assert_eq!(q.load().shared(), 0);
+        assert_eq!(q.load().local(), 3);
     }
 
     #[test]
     fn test_notification_flag() {
-        let counter = TaskQueue::new();
+        let q = TaskQueue::new();
 
-        assert_eq!(counter.load().is_notified(), false);
-        counter.mark_as_notified();
-        assert_eq!(counter.load().is_notified(), true);
+        assert_eq!(q.load().is_notified(), false);
+        assert!(!q.increase_shared_and_mark_as_notified().is_notified());
 
-        counter.increase_local();
-        assert_eq!(counter.load().local(), 1);
-        assert_eq!(counter.load().is_notified(), true); // flag unaffected
-
-        counter.increase_shared();
-        assert_eq!(counter.load().shared(), 1);
-        assert_eq!(counter.load().is_notified(), true); // flag unaffected
+        let old = q.increase_local();
+        assert_eq!(old.local(), 0);
+        assert_eq!(old.shared(), 1);
+        assert_eq!(old.is_notified(), true); // flag unaffected
 
         // Attempt to clear NOTIFIED_FLAG while shared is not empty
-        counter.accept_notify_once_if_shared_queue_is_empty();
-        assert_eq!(counter.load().is_notified(), true); // flag unaffected
+        let old = q.accept_notify_once_if_shared_queue_is_empty();
+        assert_eq!(old.is_notified(), true);
+        assert_eq!(q.load().is_notified(), true); // flag unaffected
 
         // clear shared counter
-        counter.move_shared_to_local(counter.load());
-        assert_eq!(counter.load().local(), 2);
-        assert_eq!(counter.load().shared(), 0);
-        assert_eq!(counter.load().is_notified(), true);
+        q.move_shared_to_local(old);
 
         // Now shared is empty, clearing `NOTIFIED_FLAG` should succeed.
-        counter.accept_notify_once_if_shared_queue_is_empty();
-        assert_eq!(counter.load().is_notified(), false);
+        let old = q.accept_notify_once_if_shared_queue_is_empty();
+        assert_eq!(old.local(), 2);
+        assert_eq!(old.shared(), 0);
+        assert_eq!(old.is_notified(), true);
 
         // Mark as notified again
-        counter.mark_as_notified();
-        assert_eq!(counter.load().is_notified(), true);
+        let old = q.increase_shared_and_mark_as_notified();
+        assert_eq!(old.is_notified(), false);
 
-        // Increase local and shared counters
-        counter.increase_local();
-        counter.increase_shared();
-        assert_eq!(counter.load().local(), 3);
-        assert_eq!(counter.load().shared(), 1);
-        assert_eq!(counter.load().is_notified(), true);
+        let curr = q.load();
+        assert_eq!(curr.local(), 2);
+        assert_eq!(curr.shared(), 1);
+        assert_eq!(curr.is_notified(), true);
 
-        counter.clear_notified_flag();
-        assert_eq!(counter.load().is_notified(), false);
+        q.clear_notified_flag();
+        assert_eq!(q.load().is_notified(), false);
+
+        let old = q.increase_shared_and_mark_as_notified();
+        assert_eq!(old.shared(), 1);
+        assert_eq!(old.is_notified(), false);
+
+        // Increase local
+        let old = q.increase_local();
+        assert_eq!(old.local(), 2);
+        assert_eq!(old.is_notified(), true);
+
+        let curr = q.load();
+        assert_eq!(curr.local(), 3);
+        assert_eq!(curr.shared(), 2);
+        assert_eq!(curr.is_notified(), true);
     }
 }
