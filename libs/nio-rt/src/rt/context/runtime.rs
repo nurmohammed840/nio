@@ -84,7 +84,15 @@ impl RuntimeContext {
 
     pub(crate) fn send_task_at(&self, id: WorkerId, task: Task) {
         self.workers.shared_queue(id).push(task);
-        self.workers.task_queue(id).increase_shared();
-        self.workers.notifier(id).notify_once();
+        
+        let task_queue = self.workers.task_queue(id);
+        let state = task_queue.increase_shared_and_mark_as_notified();
+        if !state.is_notified() {
+            if let Err(_err) = self.workers.notifier(id).wake() {
+                task_queue.clear_notified_flag();
+                #[cfg(debug_assertions)]
+                eprintln!("notifier error: {_err}");
+            }
+        }
     }
 }

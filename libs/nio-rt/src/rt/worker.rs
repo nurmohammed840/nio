@@ -4,12 +4,7 @@ use crate::{
 };
 
 use super::*;
-use std::{
-    io,
-    rc::Rc,
-    sync::atomic::{AtomicUsize, Ordering},
-    time::Duration,
-};
+use std::{io, rc::Rc, time::Duration};
 
 use crossbeam_queue::SegQueue;
 
@@ -29,39 +24,8 @@ impl WorkerId {
     }
 }
 
-pub struct Notifier {
-    waker: driver::Waker,
-    state: AtomicUsize,
-}
-
-impl Notifier {
-    const RESET: usize = 0;
-    const NOTIFIED: usize = 1;
-
-    fn new(waker: driver::Waker) -> Self {
-        Self {
-            waker,
-            state: AtomicUsize::new(Notifier::RESET),
-        }
-    }
-
-    pub fn notify_once(&self) {
-        if self.state.swap(Notifier::NOTIFIED, Ordering::AcqRel) == Notifier::RESET {
-            let _result = self.waker.wake();
-            #[cfg(debug_assertions)]
-            if let Err(err) = _result {
-                eprintln!("wake error: {err:#?}");
-            }
-        }
-    }
-
-    pub fn accept_notify_once(&self) {
-        self.state.store(Notifier::RESET, Ordering::Release);
-    }
-}
-
 pub struct Workers {
-    notifiers: Box<[Notifier]>,
+    notifiers: Box<[driver::Waker]>,
     shared_queues: Box<[SharedQueue]>,
     pub(crate) task_queues: Box<[TaskQueue]>,
 }
@@ -86,7 +50,7 @@ impl Workers {
         }
     }
 
-    pub fn notifier(&self, id: WorkerId) -> &Notifier {
+    pub fn notifier(&self, id: WorkerId) -> &driver::Waker {
         unsafe { self.notifiers.get_unchecked(id.get()) }
     }
 
@@ -109,7 +73,7 @@ impl Workers {
         for _ in 0..count {
             let (driver, waker) = Driver::with_capacity(1024)?;
             drivers.push(driver);
-            notifier.push(Notifier::new(waker));
+            notifier.push(waker);
         }
 
         Ok((
@@ -125,7 +89,6 @@ impl Workers {
     pub fn job(context: Rc<LocalContext>, tick: u32, mut driver: Driver) {
         context.clone().init();
 
-        let notifier = context.notifier();
         let task_queue = context.task_queue();
 
         loop {
@@ -144,39 +107,34 @@ impl Workers {
                 }
             }
 
+            let expired_timers = unsafe { context.timers(|timer| timer.fetch(timer.clock.now())) };
+            expired_timers.notify_all();
+
             let mut local_queue_is_empty = unsafe { context.local_queue(|q| q.is_empty()) };
 
-            if local_queue_is_empty {
+            let counter = if local_queue_is_empty {
                 // Accept notification from other threads.
-                notifier.accept_notify_once();
-            }
+                task_queue.accept_notify_once_if_shared_queue_is_empty()
+            } else {
+                task_queue.load()
+            };
 
-            let counter = task_queue.load();
             if counter.shared_queue_has_data() {
                 context.move_tasks_from_shared_to_local_queue(counter);
                 local_queue_is_empty = false
             }
 
-            let (expired, timeout) = unsafe {
+            let timeout = unsafe {
                 context.timers(|timer| {
-                    let now = timer.clock.now();
-                    let timers_expired = timer.fetch(now);
-
-                    let timeout = if !local_queue_is_empty || timers_expired.is_some() {
-                        // Do not sleep; We have more work to do.
-                        Some(Duration::ZERO)
-                    } else {
+                    if local_queue_is_empty {
                         // No immediate work; Sleep until the next timer fires,
                         // or until woken by an I/O event or another thread send more task.
-                        timer.next_timeout(now)
-                    };
-                    (timers_expired, timeout)
+                        return timer.next_timeout(timer.clock.current());
+                    }
+                    // Do not sleep; We have more work to do.
+                    Some(Duration::ZERO)
                 })
             };
-
-            if let Some(timers) = expired {
-                timers.notify_all();
-            }
 
             // `driver.poll` method clear wake up notifications.
             let events = match driver.poll(timeout) {

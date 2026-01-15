@@ -68,10 +68,6 @@ impl TaskQueue {
         }
     }
 
-    pub fn mark_as_notified(&self) {
-        self.counter.fetch_or(NOTIFIED_FLAG, Ordering::Release);
-    }
-
     /// clear `NOTIFIED_FLAG`
     pub fn accept_notify_once_if_shared_queue_is_empty(&self) -> Counter {
         let result = self
@@ -105,9 +101,19 @@ impl TaskQueue {
         old
     }
 
-    /// Only this function is allowed to call from other thread.
-    pub fn increase_shared(&self) -> Counter {
-        Counter(self.counter.fetch_add(SHARED_COUNTER_ONE, Ordering::AcqRel))
+    pub fn clear_notified_flag(&self) {
+        self.counter.fetch_and(!NOTIFIED_FLAG, Ordering::Release);
+    }
+
+    pub fn increase_shared_and_mark_as_notified(&self) -> Counter {
+        let state = self
+            .counter
+            .fetch_update(Ordering::AcqRel, Ordering::Relaxed, |curr| {
+                Some((curr | NOTIFIED_FLAG) + SHARED_COUNTER_ONE)
+            })
+            .unwrap();
+
+        Counter(state)
     }
 
     /// Remove `N` from SHARED_COUNTER
@@ -144,6 +150,17 @@ impl fmt::Debug for Counter {
 mod tests {
     #![allow(unused)]
     use super::*;
+
+    impl TaskQueue {
+        /// Only this function is allowed to call from other thread.
+        pub fn increase_shared(&self) -> Counter {
+            Counter(self.counter.fetch_add(SHARED_COUNTER_ONE, Ordering::AcqRel))
+        }
+
+        pub fn mark_as_notified(&self) {
+            self.counter.fetch_or(NOTIFIED_FLAG, Ordering::Release);
+        }
+    }
 
     #[test]
     fn test_local_counter() {
@@ -218,5 +235,8 @@ mod tests {
         assert_eq!(counter.load().local(), 3);
         assert_eq!(counter.load().shared(), 1);
         assert_eq!(counter.load().is_notified(), true);
+
+        counter.clear_notified_flag();
+        assert_eq!(counter.load().is_notified(), false);
     }
 }

@@ -137,10 +137,6 @@ impl LocalContext {
         self.runtime_ctx.workers.task_queue(self.worker_id)
     }
 
-    pub(crate) fn notifier(&self) -> &worker::Notifier {
-        self.runtime_ctx.workers.notifier(self.worker_id)
-    }
-
     #[inline]
     pub(crate) fn shared_queue(&self) -> &SharedQueue {
         self.runtime_ctx.workers.shared_queue(self.worker_id)

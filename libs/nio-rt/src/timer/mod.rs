@@ -128,14 +128,11 @@ impl Timers {
             .checked_duration_since(since)
     }
 
-    pub fn fetch(&mut self, upto: Instant) -> Option<Elapsed> {
+    pub fn fetch(&mut self, upto: Instant) -> Elapsed {
         let timer = &Timer::new(upto);
         let right = self.entries.split_off(&TimerEntry { timer });
         let left = mem::replace(&mut self.entries, right);
-        if left.is_empty() {
-            return None;
-        }
-        Some(Elapsed { entries: left })
+        Elapsed { entries: left }
     }
 }
 
@@ -144,6 +141,7 @@ pub struct Elapsed {
 }
 
 impl Elapsed {
+    /// [`crate::LocalContext::add_task_to_local_queue`]
     pub fn notify_all(self) {
         for (entry, _) in self.entries {
             let timer = entry.timer();
