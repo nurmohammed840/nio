@@ -121,6 +121,9 @@ impl Timers {
     }
 
     pub fn next_timeout(&self, since: Instant) -> Option<Duration> {
+        if self.entries.is_empty() {
+            return None;
+        }
         self.entries
             .first_key_value()?
             .0

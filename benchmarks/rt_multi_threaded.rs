@@ -1,4 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
+use std::hint::black_box;
 use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
 use std::sync::mpsc;
 // use std::time::{Duration, Instant};
@@ -20,13 +21,6 @@ fn rt_multi_spawn_many_local(c: &mut Criterion) {
     let rt = Runtime::new(NUM_WORKERS);
     let ctx = rt.handle();
 
-    let m = rt.0.context().metrics();
-    std::thread::spawn(move || loop {
-        std::thread::sleep(std::time::Duration::from_secs(3));
-        let count: Vec<_> = m.task_counts().collect();
-        println!("count: {:#?}", count);
-    });
-
     let (tx, rx) = mpsc::sync_channel(1000);
     static REM: AtomicUsize = AtomicUsize::new(0);
 
@@ -47,9 +41,43 @@ fn rt_multi_spawn_many_local(c: &mut Criterion) {
     });
 }
 
+fn rt_multi_spawn_many_remote(c: &mut Criterion) {
+    let rt = Runtime::new(NUM_WORKERS);
+    c.bench_function("spawn_many_remote", |b| {
+        b.iter(|| {
+            let c = rt.block_on(async {
+                const NUM_TASK: usize = NUM_SPAWN / NUM_WORKERS;
+                let mut workers = Vec::with_capacity(NUM_WORKERS);
+                for _ in 0..NUM_WORKERS {
+                    workers.push(spawn(async {
+                        let mut tasks = Vec::with_capacity(NUM_TASK);
+                        for _ in 0..NUM_TASK {
+                            tasks.push(spawn(async { black_box(1) }));
+                        }
+
+                        let mut c = 0;
+                        for task in tasks {
+                            c += task.await.unwrap();
+                        }
+                        c
+                    }));
+                }
+
+                let mut c = 0;
+                for task in workers {
+                    c += task.await.unwrap();
+                }
+                c
+            });
+            assert_eq!(c, NUM_SPAWN);
+        })
+    });
+}
+
 criterion_group!(
     rt_multi_scheduler,
     rt_multi_spawn_many_local,
+    rt_multi_spawn_many_remote,
     // rt_multi_spawn_many_remote_idle,
     // rt_multi_spawn_many_remote_busy1,
     // rt_multi_spawn_many_remote_busy2,
