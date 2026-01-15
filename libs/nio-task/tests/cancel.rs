@@ -157,12 +157,13 @@ fn cancel_during_run() {
     future!(f, POLL, DROP_F, DROP_T);
     schedule!(s, SCHEDULE, DROP_S);
     let (runnable, task) = async_task::spawn(f, s);
+    let delay_ms = if cfg!(miri) { 500 } else { 200 };
 
     Parallel::new()
         .add(|| {
             runnable.run();
 
-            thread::sleep(ms(200));
+            thread::sleep(ms(delay_ms));
 
             assert_eq!(POLL.load(Ordering::SeqCst), 1);
             assert_eq!(SCHEDULE.load(Ordering::SeqCst), 0);
@@ -171,7 +172,7 @@ fn cancel_during_run() {
             assert_eq!(DROP_S.load(Ordering::SeqCst), 1);
         })
         .add(|| {
-            thread::sleep(ms(200));
+            thread::sleep(ms(delay_ms));
 
             assert!(future::block_on(task.cancel()).is_some());
             assert_eq!(POLL.load(Ordering::SeqCst), 1);

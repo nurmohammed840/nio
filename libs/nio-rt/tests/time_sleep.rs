@@ -8,7 +8,8 @@ use support::futures::test::{assert_pending, task};
 
 #[test]
 async fn immediate_sleep() {
-    for _ in 0..1000 {
+    let iter = if cfg!(miri) { 10 } else { 1000 };
+    for _ in 0..iter {
         let now = Instant::now();
         let mut sleep = Sleep::at(now);
         (&mut sleep).await;
