@@ -12,6 +12,7 @@ tokio = []
 tokio = { version = "1", features = ["full"] }
 nio = { path = "../libs/nio-rt" }
 nio-future = { path = "../libs/nio-future" }
+futures = "*"
 criterion = "0.7"
 
 [dev-dependencies]
