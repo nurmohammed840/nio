@@ -918,6 +918,7 @@ dependencies = [
  "mio",
  "nio-future",
  "nio-macros",
+ "nio-metrics",
  "nio-task",
  "nio-threadpool",
  "pin-project-lite",
@@ -936,6 +937,10 @@ dependencies = [
  "quote2",
  "syn 2.0.87",
 ]
+
+[[package]]
+name = "nio-metrics"
+version = "0.1.0"
 
 [[package]]
 name = "nio-task"

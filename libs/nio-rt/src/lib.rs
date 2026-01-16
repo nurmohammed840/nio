@@ -10,8 +10,8 @@ mod utils;
 use std::{num::NonZeroUsize, time::Duration};
 
 pub use nio_macros::*;
-pub use nio_task::{AbortHandle, JoinError, JoinHandle, TaskId};
 pub use nio_task::id as task_id;
+pub use nio_task::{AbortHandle, JoinError, JoinHandle, TaskId};
 pub use rt::{
     Runtime,
     context::{LocalContext, RuntimeContext},
@@ -32,8 +32,11 @@ pub struct RuntimeBuilder {
 
     max_blocking_threads: u16,
     thread_stack_size: usize,
-    thread_name: Option<Box<dyn Fn(usize) -> String + Send + Sync>>,
     thread_timeout: Option<Duration>,
+    thread_name: Option<Box<dyn Fn(usize) -> String + Send + Sync>>,
+
+    #[cfg(feature = "metrics")]
+    measurement: Option<Box<dyn metrics::Measurement>>,
 }
 
 impl Default for RuntimeBuilder {
@@ -45,14 +48,18 @@ impl Default for RuntimeBuilder {
                 .try_into()
                 .unwrap(),
 
+            worker_stack_size: None,
+            worker_name: Box::new(|id| format!("Worker: {id}")),
+
             event_interval: 61,
 
-            worker_stack_size: None,
-            thread_stack_size: 0,
             max_blocking_threads: 512,
+            thread_stack_size: 0,
             thread_timeout: Some(Duration::from_secs(10)),
             thread_name: Some(Box::new(|id| format!("Thread: {id}"))),
-            worker_name: Box::new(|id| format!("Worker: {id}")),
+
+            #[cfg(feature = "metrics")]
+            measurement: Some(Box::new(metrics::NoMeasurement)),
         }
     }
 }
@@ -60,6 +67,15 @@ impl Default for RuntimeBuilder {
 impl RuntimeBuilder {
     pub fn new() -> RuntimeBuilder {
         Self::default()
+    }
+
+    #[allow(warnings)]
+    pub fn measurement(mut self, metrics: impl metrics::Measurement + 'static) -> Self {
+        #[cfg(feature = "metrics")]
+        {
+            self.measurement = Some(Box::new(metrics));
+        }
+        self
     }
 
     pub fn worker_threads(mut self, val: u8) -> Self {

@@ -69,7 +69,8 @@ impl TaskQueue {
     }
 
     /// clear `NOTIFIED_FLAG`
-    pub fn accept_notify_once_if_shared_queue_is_empty(&self) -> Counter {
+    #[inline]
+    pub fn accept_notify_once_if_shared_queue_is_empty(&self) -> (bool, Counter) {
         let result = self
             .counter
             .fetch_update(Ordering::AcqRel, Ordering::Acquire, |curr| {
@@ -87,7 +88,8 @@ impl TaskQueue {
             });
 
         match result {
-            Ok(state) | Err(state) => Counter(state),
+            Ok(state) => (true, Counter(state)),
+            Err(state) => (false, Counter(state)),
         }
     }
 
@@ -203,7 +205,8 @@ mod tests {
         assert_eq!(old.is_notified(), true); // flag unaffected
 
         // Attempt to clear NOTIFIED_FLAG while shared is not empty
-        let old = q.accept_notify_once_if_shared_queue_is_empty();
+        let (is_flag_removed, old) = q.accept_notify_once_if_shared_queue_is_empty();
+        assert_eq!(is_flag_removed, false);
         assert_eq!(old.is_notified(), true);
         assert_eq!(q.load().is_notified(), true); // flag unaffected
 
@@ -211,7 +214,8 @@ mod tests {
         q.move_shared_to_local(old);
 
         // Now shared is empty, clearing `NOTIFIED_FLAG` should succeed.
-        let old = q.accept_notify_once_if_shared_queue_is_empty();
+        let (is_flag_removed, old) = q.accept_notify_once_if_shared_queue_is_empty();
+        assert_eq!(is_flag_removed, true);
         assert_eq!(old.local(), 2);
         assert_eq!(old.shared(), 0);
         assert_eq!(old.is_notified(), true);

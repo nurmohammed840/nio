@@ -9,6 +9,7 @@ nio-task = { path = "../nio-task", version = "*" }
 nio-future = { path = "../nio-future", version = "*" }
 nio-threadpool = { path = "../nio-threadpool", version = "*" }
 nio-macros = { path = "../nio-macros", version = "*" }
+nio-metrics = { path = "../nio-metrics", version = "*" }
 
 crossbeam-queue = "0.3"
 
@@ -17,6 +18,7 @@ tokio = { version = "1", default-features = false, optional = true }
 
 [features]
 default = ["futures-io"]
+metrics = []
 tokio-io = ["dep:tokio"]
 futures-io = ["dep:futures-io"]
 
@@ -35,5 +37,5 @@ pin-project-lite = "*"
 
 
 [[test]]
-name = "async_io_test_suite"    # The name of the test binary
+name = "async_io_test_suite"   # The name of the test binary
 path = "tests/async-io/mod.rs"

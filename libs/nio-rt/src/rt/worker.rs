@@ -14,7 +14,7 @@ use task_queue::TaskQueue;
 
 pub type SharedQueue = SegQueue<Task>;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct WorkerId(u8);
 
 impl WorkerId {
@@ -114,7 +114,18 @@ impl Workers {
 
             let counter = if local_queue_is_empty {
                 // Accept notification from other threads.
-                task_queue.accept_notify_once_if_shared_queue_is_empty()
+                let (_notify_flag_removed, state) =
+                    task_queue.accept_notify_once_if_shared_queue_is_empty();
+
+                #[cfg(feature = "metrics")]
+                if _notify_flag_removed {
+                    context
+                        .runtime_ctx
+                        .measurement
+                        .queue_drained(context.worker_id.get());
+                }
+                
+                state
             } else {
                 task_queue.load()
             };

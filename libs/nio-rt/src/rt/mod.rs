@@ -15,8 +15,15 @@ use worker::Workers;
 impl RuntimeBuilder {
     pub fn rt(mut self) -> io::Result<Runtime> {
         let (workers, drivers) = Workers::new(self.worker_threads)?;
+
         let context = Arc::new(RuntimeContext {
             workers,
+            #[cfg(feature = "metrics")]
+            measurement: {
+                let mut metrics = self.measurement.take().unwrap();
+                metrics.init(self.worker_threads.into());
+                metrics
+            },
             threadpool: ThreadPool::new()
                 .max_threads_limit(self.max_blocking_threads)
                 .stack_size(self.thread_stack_size)
