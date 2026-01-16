@@ -1,4 +1,5 @@
 pub use nio::{sleep, spawn, spawn_blocking, spawn_local, spawn_pinned, timeout};
+use nio_metrics::SimpleMeasurement;
 use std::{future::Future, sync::Arc};
 
 pub struct Runtime(pub nio::Runtime);
@@ -7,6 +8,7 @@ impl Runtime {
     pub fn new(core: usize) -> Runtime {
         Self(
             nio::RuntimeBuilder::new()
+                .measurement(SimpleMeasurement::new())
                 .worker_threads(core as u8)
                 .rt()
                 .unwrap(),
@@ -16,10 +18,15 @@ impl Runtime {
     pub fn multi() -> Runtime {
         Self(
             nio::RuntimeBuilder::new()
+                .measurement(SimpleMeasurement::new())
                 .max_blocking_threads(512)
                 .rt()
                 .unwrap(),
         )
+    }
+
+    pub fn print_measurement(&self) {
+        println!("{:#?}", self.0.context().metrics().measurement());
     }
 
     pub fn spawn<F>(&self, future: F) -> nio::JoinHandle<F::Output>
@@ -29,7 +36,7 @@ impl Runtime {
     {
         self.0.spawn(future)
     }
-    
+
     pub fn handle(&self) -> Arc<nio::RuntimeContext> {
         self.0.context()
     }

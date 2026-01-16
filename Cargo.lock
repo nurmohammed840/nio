@@ -214,6 +214,7 @@ dependencies = [
  "futures",
  "nio",
  "nio-future",
+ "nio-metrics",
  "tokio",
 ]
 

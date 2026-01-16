@@ -34,7 +34,7 @@ impl RuntimeMetrics {
         return None;
         #[cfg(feature = "metrics")]
         {
-            let measurement: &dyn Any = &self.ctx.measurement;
+            let measurement: &dyn std::any::Any = &*self.ctx.measurement;
             measurement.downcast_ref::<T>()
         }
     }

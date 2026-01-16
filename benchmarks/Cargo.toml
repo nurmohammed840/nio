@@ -10,7 +10,9 @@ tokio = []
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
-nio = { path = "../libs/nio-rt" }
+# nio = { path = "../libs/nio-rt", features = ["metrics"] }
+nio = { path = "../libs/nio-rt", features = [] }
+nio-metrics = { path = "../libs/nio-metrics" }
 nio-future = { path = "../libs/nio-future" }
 futures = "*"
 criterion = "0.7"

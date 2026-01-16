@@ -1,3 +1,4 @@
+// #![allow(warnings)]
 use criterion::{criterion_group, criterion_main, Criterion};
 use futures::channel::oneshot;
 use std::hint::black_box;
@@ -22,6 +23,19 @@ mod import {
 const NUM_WORKERS: usize = 4;
 const NUM_SPAWN: usize = 10_000;
 const STALL_DUR: Duration = Duration::from_micros(10);
+
+criterion_main!(rt_multi_scheduler);
+criterion_group!(
+    rt_multi_scheduler,
+    rt_multi_spawn_many_local,
+    rt_multi_spawn_many_remote,
+    rt_multi_spawn_many_remote_idle,
+    rt_multi_spawn_many_remote_busy1,
+    rt_multi_spawn_many_remote_busy2,
+    rt_multi_ping_pong,
+    rt_multi_yield_many,
+    rt_multi_chained_spawn,
+);
 
 fn rt_multi_spawn_many_local(c: &mut Criterion) {
     let rt = Runtime::new(NUM_WORKERS);
@@ -277,17 +291,3 @@ fn stall() {
         thread::yield_now();
     }
 }
-
-criterion_group!(
-    rt_multi_scheduler,
-    rt_multi_spawn_many_local,
-    rt_multi_spawn_many_remote,
-    rt_multi_spawn_many_remote_idle,
-    rt_multi_spawn_many_remote_busy1,
-    rt_multi_spawn_many_remote_busy2,
-    rt_multi_ping_pong,
-    rt_multi_yield_many,
-    rt_multi_chained_spawn,
-);
-
-criterion_main!(rt_multi_scheduler);
