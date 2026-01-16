@@ -7,6 +7,7 @@ mod rt;
 mod timer;
 mod utils;
 
+use std::num::NonZero;
 use std::{num::NonZeroUsize, time::Duration};
 
 pub use nio_macros::*;
@@ -29,6 +30,7 @@ pub struct RuntimeBuilder {
     worker_name: Box<dyn Fn(u8) -> String + Send + Sync>,
 
     event_interval: u32,
+    min_tasks_per_worker: Option<NonZero<usize>>,
 
     max_blocking_threads: u16,
     thread_stack_size: usize,
@@ -52,6 +54,7 @@ impl Default for RuntimeBuilder {
             worker_name: Box::new(|id| format!("Worker: {id}")),
 
             event_interval: 61,
+            min_tasks_per_worker: None,
 
             max_blocking_threads: 512,
             thread_stack_size: 0,
@@ -92,6 +95,11 @@ impl RuntimeBuilder {
     pub fn event_interval(mut self, tick: u32) -> Self {
         assert!(tick > 0);
         self.event_interval = tick;
+        self
+    }
+
+    pub fn min_tasks_per_worker(mut self, count: usize) -> Self {
+        self.min_tasks_per_worker = NonZero::new(count);
         self
     }
 

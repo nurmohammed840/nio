@@ -1,10 +1,10 @@
 use crate::{
     driver::{self, Driver},
-    utils::min_index_by_key,
+    utils::find_index_of_lowest,
 };
 
 use super::*;
-use std::{io, rc::Rc, time::Duration};
+use std::{io, num::NonZero, rc::Rc, time::Duration};
 
 use crossbeam_queue::SegQueue;
 
@@ -28,6 +28,7 @@ pub struct Workers {
     notifiers: Box<[driver::Waker]>,
     shared_queues: Box<[SharedQueue]>,
     pub(crate) task_queues: Box<[TaskQueue]>,
+    pub(crate) min_tasks_per_worker: Option<NonZero<usize>>,
 }
 
 impl Workers {
@@ -43,8 +44,12 @@ impl Workers {
 
     pub fn least_loaded_worker(&self) -> WorkerId {
         unsafe {
+            let min = match self.min_tasks_per_worker {
+                Some(count) => count.get() as u64,
+                None => self.task_queues.len() as u64 / 2,
+            };
             // Safety: `task_counters` is not empty
-            let id = min_index_by_key(&self.task_queues, |counter| counter.load().total());
+            let id = find_index_of_lowest(&self.task_queues, min, |counter| counter.load().total());
             debug_assert!(self.task_queues.get(id).is_some());
             WorkerId(id as u8)
         }
@@ -66,7 +71,10 @@ impl Workers {
 }
 
 impl Workers {
-    pub fn new(count: u8) -> io::Result<(Self, Box<[Driver]>)> {
+    pub fn new(
+        count: u8,
+        min_tasks_per_worker: Option<NonZero<usize>>,
+    ) -> io::Result<(Self, Box<[Driver]>)> {
         let mut drivers = Vec::with_capacity(count as usize);
         let mut notifier = Vec::with_capacity(count as usize);
 
@@ -78,6 +86,7 @@ impl Workers {
 
         Ok((
             Self {
+                min_tasks_per_worker,
                 notifiers: notifier.into_boxed_slice(),
                 task_queues: (0..count).map(|_| TaskQueue::new()).collect(),
                 shared_queues: (0..count).map(|_| SegQueue::new()).collect(),
@@ -124,7 +133,7 @@ impl Workers {
                         .measurement
                         .queue_drained(context.worker_id.get());
                 }
-                
+
                 state
             } else {
                 task_queue.load()

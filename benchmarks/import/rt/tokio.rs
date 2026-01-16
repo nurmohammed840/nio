@@ -47,6 +47,8 @@ impl Runtime {
         self.0.handle()
     }
 
+    pub fn print_measurement(&self) {}
+
     pub fn block_on<F>(&self, future: F) -> F::Output
     where
         F: Future + Send + 'static,

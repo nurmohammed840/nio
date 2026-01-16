@@ -14,7 +14,7 @@ use worker::Workers;
 
 impl RuntimeBuilder {
     pub fn rt(mut self) -> io::Result<Runtime> {
-        let (workers, drivers) = Workers::new(self.worker_threads)?;
+        let (workers, drivers) = Workers::new(self.worker_threads, self.min_tasks_per_worker)?;
 
         let context = Arc::new(RuntimeContext {
             workers,
