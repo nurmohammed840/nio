@@ -965,6 +965,7 @@ dependencies = [
  "easy-parallel",
  "flaky_test",
  "flume",
+ "nio",
  "smol",
 ]
 

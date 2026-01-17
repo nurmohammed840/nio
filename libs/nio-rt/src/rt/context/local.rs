@@ -82,7 +82,7 @@ impl LocalContext {
     ///
     /// Caller can't do this:
     ///
-    /// ```rust,ignore
+    /// ```ignore
     /// ctx.local_queue(|q1| {
     ///     ctx.local_queue(|q2| {
     ///         // ❌ Undefined behavior!

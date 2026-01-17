@@ -12,6 +12,7 @@ description = "async task implementation"
 [dependencies]
 
 [dev-dependencies]
+nio = { path = "../nio-rt" }
 atomic-waker = "1"
 easy-parallel = "3"
 flaky_test = "0.2"

@@ -36,7 +36,7 @@ use std::{io, path::Path};
 /// use std::net::SocketAddr;
 ///
 /// #[nio::main]
-/// async fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
+/// async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
 ///     let contents = fs::read("address.txt").await?;
 ///     let foo: SocketAddr = String::from_utf8_lossy(&contents).parse()?;
 ///     Ok(())
