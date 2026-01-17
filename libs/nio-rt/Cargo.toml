@@ -1,0 +1,41 @@
+[package]
+name = "nio"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+mio = { version = "1", features = ["os-poll", "net"] }
+nio-task = { path = "../nio-task", version = "*" }
+nio-future = { path = "../nio-future", version = "*" }
+nio-threadpool = { path = "../nio-threadpool", version = "*" }
+nio-macros = { path = "../nio-macros", version = "*" }
+nio-metrics = { path = "../nio-metrics", version = "*" }
+
+crossbeam-queue = "0.3"
+
+futures-io = { version = "0.3", optional = true }
+tokio = { version = "1", default-features = false, optional = true }
+
+[features]
+default = ["futures-io"]
+metrics = []
+tokio-io = ["dep:tokio"]
+futures-io = ["dep:futures-io"]
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [
+  "cfg(mio_unsupported_force_poll_poll)",
+] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
+futures-lite = { version = "2" }
+futures = "*"
+tokio-test = { version = "0.4.0" }
+pin-project-lite = "*"
+# bytes = { version = "1" }
+
+
+[[test]]
+name = "async_io_test_suite"   # The name of the test binary
+path = "tests/async-io/mod.rs"

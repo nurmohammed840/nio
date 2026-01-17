@@ -1,0 +1,16 @@
+[package]
+name = "nio-macros"
+version = "0.1.0"
+edition = "2024"
+
+license = "Apache-2.0"
+description = """
+Nio's proc macros.
+"""
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "2", features = ["full"] }
+quote2 = "0.9"

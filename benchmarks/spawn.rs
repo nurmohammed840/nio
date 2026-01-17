@@ -1,92 +1,97 @@
-//! Benchmark spawning a task onto the basic and threaded Tokio executors.
-//! This essentially measure the time to enqueue a task in the local and remote
-//! case.
+use criterion::{criterion_group, criterion_main, Criterion};
+use std::hint::black_box;
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use import::rt::{self, *};
+use import::task::yield_now;
 
-mod aio;
+mod import {
+    pub mod task;
+
+    pub mod rt;
+    // pub mod rt {
+    //     pub mod tokio;
+    //     pub use tokio::*;
+    // }
+}
 
 async fn work() -> usize {
     let val = 1 + 1;
-    aio::task::yield_now().await;
+    yield_now().await;
     black_box(val)
 }
 
-fn threaded_scheduler_spawn(c: &mut Criterion) {
-    let runtime = aio::runtime::Builder::new_multi_thread()
-        .worker_threads(1)
-        .build()
-        .unwrap();
-    c.bench_function("threaded_scheduler_spawn", |b| {
+fn basic_scheduler_spawn(c: &mut Criterion) {
+    let runtime = Runtime::new(1);
+
+    c.bench_function("basic_scheduler_spawn", |b| {
         b.iter(|| {
             runtime.block_on(async {
-                let h = aio::spawn(work());
+                let h = rt::spawn(work());
                 assert_eq!(h.await.unwrap(), 2);
             });
         })
     });
 }
 
-fn threaded_scheduler_spawn10(c: &mut Criterion) {
-    let runtime = aio::runtime::Builder::new_multi_thread()
-        .worker_threads(1)
-        .build()
-        .unwrap();
-    c.bench_function("threaded_scheduler_spawn10", |b| {
+const COUNT: [usize; 3] = [10, 100, 1000];
+
+fn basic_scheduler_spawn_many(c: &mut Criterion) {
+    let runtime = Runtime::new(1);
+    for count in COUNT {
+        c.bench_function(&format!("basic_scheduler_spawn_{count}"), |b| {
+            b.iter(|| {
+                runtime.block_on(async move {
+                    let mut handles = Vec::with_capacity(count);
+                    for _ in 0..count {
+                        handles.push(rt::spawn(work()));
+                    }
+                    for handle in handles {
+                        assert_eq!(handle.await.unwrap(), 2);
+                    }
+                });
+            })
+        });
+    }
+}
+
+fn threaded_scheduler_spawn(c: &mut Criterion) {
+    let runtime = Runtime::new(2);
+
+    c.bench_function("threaded_scheduler_spawn", |b| {
         b.iter(|| {
             runtime.block_on(async {
-                let mut handles = Vec::with_capacity(10);
-                for _ in 0..10 {
-                    handles.push(aio::spawn(work()));
-                }
-                for handle in handles {
-                    assert_eq!(handle.await.unwrap(), 2);
-                }
+                let h = rt::spawn(work());
+                assert_eq!(h.await.unwrap(), 2);
             });
         })
     });
 }
 
-// fn basic_scheduler_spawn(c: &mut Criterion) {
-//     let runtime = aio::runtime::Builder::new_current_thread()
-//         .build()
-//         .unwrap();
-
-//     c.bench_function("basic_scheduler_spawn", |b| {
-//         b.iter(|| {
-//             runtime.block_on(async {
-//                 let h = aio::spawn(work());
-//                 assert_eq!(h.await.unwrap(), 2);
-//             });
-//         })
-//     });
-// }
-
-// fn basic_scheduler_spawn10(c: &mut Criterion) {
-//     let runtime = aio::runtime::Builder::new_current_thread()
-//         .build()
-//         .unwrap();
-//     c.bench_function("basic_scheduler_spawn10", |b| {
-//         b.iter(|| {
-//             runtime.block_on(async {
-//                 let mut handles = Vec::with_capacity(10);
-//                 for _ in 0..10 {
-//                     handles.push(aio::spawn(work()));
-//                 }
-//                 for handle in handles {
-//                     assert_eq!(handle.await.unwrap(), 2);
-//                 }
-//             });
-//         })
-//     });
-// }
+fn threaded_scheduler_spawn_many(c: &mut Criterion) {
+    let runtime = Runtime::new(2);
+    for count in COUNT {
+        c.bench_function(&format!("threaded_scheduler_spawn_{count}"), |b| {
+            b.iter(|| {
+                runtime.block_on(async move {
+                    let mut handles = Vec::with_capacity(count);
+                    for _ in 0..count {
+                        handles.push(rt::spawn(work()));
+                    }
+                    for handle in handles {
+                        assert_eq!(handle.await.unwrap(), 2);
+                    }
+                });
+            })
+        });
+    }
+}
 
 criterion_group!(
     spawn,
+    basic_scheduler_spawn,
+    basic_scheduler_spawn_many,
     threaded_scheduler_spawn,
-    threaded_scheduler_spawn10,
-    // basic_scheduler_spawn,
-    // basic_scheduler_spawn10,
+    threaded_scheduler_spawn_many,
 );
 
 criterion_main!(spawn);

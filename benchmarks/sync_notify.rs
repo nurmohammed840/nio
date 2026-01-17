@@ -1,80 +1,29 @@
-mod aio;
-
+use criterion::{
+    criterion_group, criterion_main, measurement::WallTime, BenchmarkGroup, Criterion,
+};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
 
-use tokio::sync::Notify;
+use import::channel::*;
+use import::rt::*;
 
-use criterion::measurement::WallTime;
-use criterion::{criterion_group, criterion_main, BenchmarkGroup, Criterion};
-
-fn rt() -> aio::runtime::Runtime {
-    aio::runtime::Builder::new_multi_thread()
-        .worker_threads(6)
-        .build()
-        .unwrap()
+mod import {
+    pub mod channel;
+    pub mod rt;
+    // pub mod rt {
+    //     pub mod tokio;
+    //     pub use tokio::*;
+    // }
 }
 
-fn notify_waiters<const N_WAITERS: usize>(g: &mut BenchmarkGroup<WallTime>) {
-    let rt = rt();
-    let notify = Arc::new(Notify::new());
-    let counter = Arc::new(AtomicUsize::new(0));
-    for _ in 0..N_WAITERS {
-        rt.spawn({
-            let notify = notify.clone();
-            let counter = counter.clone();
-            async move {
-                loop {
-                    notify.notified().await;
-                    counter.fetch_add(1, Ordering::Relaxed);
-                }
-            }
-        });
-    }
+criterion_main!(notify_waiters_simple);
+criterion_group!(
+    notify_waiters_simple,
+    bench_notify_one,
+    bench_notify_waiters
+);
 
-    const N_ITERS: usize = 500;
-    g.bench_function(N_WAITERS.to_string(), |b| {
-        b.iter(|| {
-            counter.store(0, Ordering::Relaxed);
-            loop {
-                notify.notify_waiters();
-                if counter.load(Ordering::Relaxed) >= N_ITERS {
-                    break;
-                }
-            }
-        })
-    });
-}
-
-fn notify_one<const N_WAITERS: usize>(g: &mut BenchmarkGroup<WallTime>) {
-    let rt = rt();
-    let notify = Arc::new(Notify::new());
-    let counter = Arc::new(AtomicUsize::new(0));
-    for _ in 0..N_WAITERS {
-        rt.spawn({
-            let notify = notify.clone();
-            let counter = counter.clone();
-            async move {
-                loop {
-                    notify.notified().await;
-                    counter.fetch_add(1, Ordering::Relaxed);
-                }
-            }
-        });
-    }
-
-    const N_ITERS: usize = 500;
-    g.bench_function(N_WAITERS.to_string(), |b| {
-        b.iter(|| {
-            counter.store(0, Ordering::Relaxed);
-            loop {
-                notify.notify_one();
-                if counter.load(Ordering::Relaxed) >= N_ITERS {
-                    break;
-                }
-            }
-        })
-    });
+fn rt() -> Runtime {
+    Runtime::new(6)
 }
 
 fn bench_notify_one(c: &mut Criterion) {
@@ -97,10 +46,62 @@ fn bench_notify_waiters(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(
-    notify_waiters_simple,
-    bench_notify_one,
-    bench_notify_waiters
-);
+fn notify_one<const N_WAITERS: usize>(g: &mut BenchmarkGroup<WallTime>) {
+    let rt = rt();
 
-criterion_main!(notify_waiters_simple);
+    static NOTIFY: Notify = Notify::const_new();
+    static COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+    for _ in 0..N_WAITERS {
+        rt.spawn({
+            async move {
+                loop {
+                    NOTIFY.notified().await;
+                    COUNTER.fetch_add(1, Ordering::Relaxed);
+                }
+            }
+        });
+    }
+
+    const N_ITERS: usize = 500;
+    g.bench_function(N_WAITERS.to_string(), |b| {
+        b.iter(|| {
+            COUNTER.store(0, Ordering::Relaxed);
+            loop {
+                NOTIFY.notify_one();
+                if COUNTER.load(Ordering::Relaxed) >= N_ITERS {
+                    break;
+                }
+            }
+        })
+    });
+}
+
+fn notify_waiters<const N_WAITERS: usize>(g: &mut BenchmarkGroup<WallTime>) {
+    let rt = rt();
+    static NOTIFY: Notify = Notify::const_new();
+    static COUNTER: AtomicUsize = AtomicUsize::new(0);
+    for _ in 0..N_WAITERS {
+        rt.spawn({
+            async move {
+                loop {
+                    NOTIFY.notified().await;
+                    COUNTER.fetch_add(1, Ordering::Relaxed);
+                }
+            }
+        });
+    }
+
+    const N_ITERS: usize = 500;
+    g.bench_function(N_WAITERS.to_string(), |b| {
+        b.iter(|| {
+            COUNTER.store(0, Ordering::Relaxed);
+            loop {
+                NOTIFY.notify_waiters();
+                if COUNTER.load(Ordering::Relaxed) >= N_ITERS {
+                    break;
+                }
+            }
+        })
+    });
+}

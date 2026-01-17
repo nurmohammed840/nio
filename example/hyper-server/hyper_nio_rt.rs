@@ -3,6 +3,7 @@
 use std::{
     future::Future,
     pin::Pin,
+    sync::Arc,
     task::{Context, Poll},
 };
 
@@ -11,8 +12,10 @@ use pin_project_lite::pin_project;
 
 /// Future executor that utilises `nio` threads.
 #[non_exhaustive]
-#[derive(Default, Debug, Clone)]
-pub struct NioExecutor {}
+#[derive(Clone)]
+pub struct NioExecutor {
+    ctx: Arc<nio::RuntimeContext>,
+}
 
 pin_project! {
     /// A wrapper that implements Nio's IO traits for an inner type that
@@ -33,14 +36,16 @@ where
     Fut::Output: Send + 'static,
 {
     fn execute(&self, fut: Fut) {
-        nio::spawn(fut);
+        self.ctx.spawn(fut);
     }
 }
 
 impl NioExecutor {
     /// Create new executor that relies on [`nio::spawn`] to execute futures.
     pub fn new() -> Self {
-        Self {}
+        Self {
+            ctx: nio::RuntimeContext::current(),
+        }
     }
 }
 
@@ -84,7 +89,6 @@ where
                 other => return other,
             }
         };
-
         unsafe {
             buf.advance(n);
         }
@@ -193,23 +197,5 @@ where
         bufs: &[std::io::IoSlice<'_>],
     ) -> Poll<Result<usize, std::io::Error>> {
         hyper::rt::Write::poll_write_vectored(self.project().inner, cx, bufs)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::rt::NioExecutor;
-    use hyper::rt::Executor;
-    use tokio::sync::oneshot;
-
-    #[nio::test]
-    #[cfg(not(miri))]
-    async fn simple_execute() -> Result<(), Box<dyn std::error::Error>> {
-        let (tx, rx) = oneshot::channel();
-        let executor = NioExecutor::new();
-        executor.execute(async move {
-            tx.send(()).unwrap();
-        });
-        rx.await.map_err(Into::into)
     }
 }

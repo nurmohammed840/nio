@@ -1,24 +1,39 @@
-mod aio;
-
-use aio::runtime::Runtime;
-use tokio::sync::{mpsc, oneshot};
-
 use criterion::{criterion_group, criterion_main, Criterion};
 
-fn request_reply_multi_threaded(c: &mut Criterion) {
-    let rt = aio::runtime::Builder::new_multi_thread()
-        .worker_threads(1)
-        .build()
-        .unwrap();
+use futures::{
+    channel::{mpsc, oneshot},
+    SinkExt, StreamExt,
+};
 
-    request_reply(c, rt);
+use import::rt::*;
+mod import {
+    pub mod rt;
+    // pub mod rt {
+    //     pub mod tokio;
+    //     pub use tokio::*;
+    // }
+}
+
+criterion_main!(sync_mpsc_oneshot_group);
+criterion_group!(
+    sync_mpsc_oneshot_group,
+    request_reply_current_thread,
+    request_reply_multi_threaded,
+);
+
+fn request_reply_current_thread(c: &mut Criterion) {
+    request_reply(c, Runtime::new(1));
+}
+
+fn request_reply_multi_threaded(c: &mut Criterion) {
+    request_reply(c, Runtime::new(2));
 }
 
 fn request_reply(b: &mut Criterion, rt: Runtime) {
     let tx = rt.block_on(async move {
         let (tx, mut rx) = mpsc::channel::<oneshot::Sender<()>>(10);
-        aio::spawn(async move {
-            while let Some(reply) = rx.recv().await {
+        spawn(async move {
+            while let Some(reply) = rx.next().await {
                 reply.send(()).unwrap();
             }
         });
@@ -27,7 +42,7 @@ fn request_reply(b: &mut Criterion, rt: Runtime) {
 
     b.bench_function("request_reply", |b| {
         b.iter(|| {
-            let task_tx = tx.clone();
+            let mut task_tx = tx.clone();
             rt.block_on(async move {
                 for _ in 0..1_000 {
                     let (o_tx, o_rx) = oneshot::channel();
@@ -38,19 +53,3 @@ fn request_reply(b: &mut Criterion, rt: Runtime) {
         })
     });
 }
-
-// fn request_reply_current_thread(c: &mut Criterion) {
-//     let rt = aio::runtime::Builder::new_current_thread()
-//         .build()
-//         .unwrap();
-//
-//     request_reply(c, rt);
-// }
-
-criterion_group!(
-    sync_mpsc_oneshot_group,
-    request_reply_multi_threaded,
-    // request_reply_current_thread,
-);
-
-criterion_main!(sync_mpsc_oneshot_group);

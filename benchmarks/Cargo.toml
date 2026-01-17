@@ -6,19 +6,27 @@ edition = "2021"
 license = "MIT"
 
 [features]
-test-util = ["tokio/test-util"]
 tokio = []
+pinned = []
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
-nio = { path = "../" }
-criterion = "0.5.1"
-rand = "0.8"
-rand_chacha = "0.3"
+# nio = { path = "../libs/nio-rt", features = ["metrics"] }
+nio = { path = "../libs/nio-rt", features = [] }
+nio-metrics = { path = "../libs/nio-metrics" }
+nio-future = { path = "../libs/nio-future" }
+futures = "*"
+
+criterion = "0.7"
+rand = "0.9"
+rand_chacha = "0.9"
 
 [dev-dependencies]
-tokio-util = { version = "0.7.0", features = ["full"] }
-tokio-stream = { version = "0.1" }
+
+[[bench]]
+name = "rt_current_thread"
+path = "rt_current_thread.rs"
+harness = false
 
 [[bench]]
 name = "rt_multi_threaded"
@@ -26,9 +34,15 @@ path = "rt_multi_threaded.rs"
 harness = false
 
 [[bench]]
+name = "spawn_blocking"
+path = "spawn_blocking.rs"
+harness = false
+
+[[bench]]
 name = "spawn"
 path = "spawn.rs"
 harness = false
+
 
 [[bench]]
 name = "sync_broadcast"
@@ -51,26 +65,6 @@ path = "sync_notify.rs"
 harness = false
 
 [[bench]]
-name = "sync_rwlock"
-path = "sync_rwlock.rs"
+name = "timer"
+path = "timer.rs"
 harness = false
-
-[[bench]]
-name = "sync_semaphore"
-path = "sync_semaphore.rs"
-harness = false
-
-[[bench]]
-name = "sync_watch"
-path = "sync_watch.rs"
-harness = false
-
-# [[bench]]
-# name = "time_now"
-# path = "time_now.rs"
-# harness = false
-
-# [[bench]]
-# name = "time_timeout"
-# path = "time_timeout.rs"
-# harness = false

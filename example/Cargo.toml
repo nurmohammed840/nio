@@ -9,7 +9,7 @@ license = "MIT"
 tokio = []
 
 [dev-dependencies]
-nio = { path = "../" }
+nio = { path = "../libs/nio-rt", features = ["tokio-io"] }
 tokio = { version = "1.0.0", features = ["full", "tracing"] }
 tokio-util = { version = "0.7.0", features = ["full"] }
 tokio-stream = { version = "0.1" }
@@ -35,45 +35,45 @@ pin-project-lite = "0.2"
 [target.'cfg(windows)'.dev-dependencies.windows-sys]
 version = "0.52"
 
-[[example]]
-name = "basic"
-path = "basic.rs"
+# [[example]]
+# name = "basic"
+# path = "basic.rs"
 
-[[example]]
-name = "chat"
-path = "chat.rs"
+# [[example]]
+# name = "chat"
+# path = "chat.rs"
 
-[[example]]
-name = "echo-udp"
-path = "echo-udp.rs"
+# [[example]]
+# name = "echo-udp"
+# path = "echo-udp.rs"
 
-[[example]]
-name = "echo"
-path = "echo.rs"
+# [[example]]
+# name = "echo"
+# path = "echo.rs"
 
-[[example]]
-name = "hello_world"
-path = "hello_world.rs"
+# [[example]]
+# name = "hello_world"
+# path = "hello_world.rs"
 
-[[example]]
-name = "print_each_packet"
-path = "print_each_packet.rs"
+# [[example]]
+# name = "print_each_packet"
+# path = "print_each_packet.rs"
 
-[[example]]
-name = "proxy"
-path = "proxy.rs"
+# [[example]]
+# name = "proxy"
+# path = "proxy.rs"
 
-[[example]]
-name = "tinydb"
-path = "tinydb.rs"
+# [[example]]
+# name = "tinydb"
+# path = "tinydb.rs"
 
-[[example]]
-name = "udp-client"
-path = "udp-client.rs"
+# [[example]]
+# name = "udp-client"
+# path = "udp-client.rs"
 
-[[example]]
-name = "tinyhttp"
-path = "tinyhttp.rs"
+# [[example]]
+# name = "tinyhttp"
+# path = "tinyhttp.rs"
 
 [[example]]
 name = "hyper-server"
