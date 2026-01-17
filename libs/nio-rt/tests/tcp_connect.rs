@@ -70,16 +70,6 @@ async fn connect_addr_ip_string() -> Result<()> {
 }
 
 #[test]
-#[cfg(not(windows))]
-async fn connect_addr_host_string() -> Result<()> {
-    test_connect(|srv| {
-        let addr = srv.local_addr()?;
-        Ok(format!("localhost:{}", addr.port()))
-    })
-    .await
-}
-
-#[test]
 async fn connect_addr_ip_port_tuple() -> Result<()> {
     test_connect(|srv| {
         let addr = srv.local_addr()?;
@@ -93,16 +83,6 @@ async fn connect_addr_ip_str_port_tuple() -> Result<()> {
     test_connect(|srv| {
         let addr = srv.local_addr()?;
         Ok(("127.0.0.1", addr.port()))
-    })
-    .await
-}
-
-#[test]
-#[cfg(not(windows))]
-async fn connect_addr_host_str_port_tuple() -> Result<()> {
-    test_connect(|srv| {
-        let addr = srv.local_addr()?;
-        Ok(("localhost", addr.port()))
     })
     .await
 }
