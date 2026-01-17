@@ -132,7 +132,7 @@ impl TaskQueue {
 
     #[inline]
     pub fn load(&self) -> Counter {
-        Counter(self.counter.load(Ordering::Acquire))
+        Counter(self.counter.load(Ordering::Relaxed))
     }
 }
 

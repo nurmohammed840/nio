@@ -34,7 +34,7 @@ fn rt_curr_spawn_many_local(c: &mut Criterion) {
 
 fn rt_curr_spawn_many_remote_busy(c: &mut Criterion) {
     let rt = Runtime::new(1);
-    
+
     rt.spawn(async {
         fn iter() {
             spawn(async { iter() });

@@ -1,4 +1,4 @@
-mod timer;
+mod blocking;
 mod socket;
 mod task;
-mod blocking;
+mod timer;

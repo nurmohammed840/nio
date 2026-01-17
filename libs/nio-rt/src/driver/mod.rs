@@ -1,9 +1,9 @@
-mod io_waker;
 mod async_io;
+mod io_waker;
 use std::{io::Result, time::Duration};
 
-pub use io_waker::IoWaker;
 pub use async_io::AsyncIO;
+pub use io_waker::IoWaker;
 pub use mio::{Events, Registry, Waker, event::Event};
 
 pub struct Driver {
@@ -29,17 +29,13 @@ impl Driver {
     pub fn has_woken(ev: &Event) -> bool {
         ev.token() == WAKE_TOKEN
     }
-    
+
     pub fn registry(&self) -> &Registry {
         self.poll.registry()
     }
 
     pub fn registry_owned(&self) -> Result<Registry> {
         self.registry().try_clone()
-    }
-
-    pub fn _is_empty(&self) -> bool {
-        self.events.is_empty()
     }
 
     pub fn poll(&mut self, timeout: Option<Duration>) -> Result<&Events> {

@@ -45,7 +45,7 @@ impl LocalContext {
         self.add_task_to_local_queue(task);
         join
     }
-    
+
     pub(crate) fn new(
         worker_id: WorkerId,
         cap: usize,

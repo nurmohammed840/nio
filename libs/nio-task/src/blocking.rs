@@ -1,6 +1,6 @@
 use crate::raw::{Fut, Header, PollStatus, RawTask, RawTaskVTable};
 use crate::waker::NOOP_WAKER;
-use crate::{TaskId, JoinError, JoinHandle};
+use crate::{JoinError, JoinHandle, TaskId};
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::task::{Poll, Waker};

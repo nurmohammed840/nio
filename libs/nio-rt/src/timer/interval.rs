@@ -77,4 +77,3 @@ impl DerefMut for Interval {
         &mut self.delay
     }
 }
-

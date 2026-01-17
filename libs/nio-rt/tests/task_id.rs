@@ -1,5 +1,5 @@
-use nio_future::yield_now;
 use nio::{TaskId, spawn, spawn_local, test};
+use nio_future::yield_now;
 
 async fn task_id() -> TaskId {
     let id = async { nio::task_id().await };

@@ -1,11 +1,11 @@
 #![cfg(not(miri))]
 
 use futures::{Stream, StreamExt};
-use nio_future::yield_now;
 use nio::{
     net::{TcpListener, TcpStream},
     spawn_local, test,
 };
+use nio_future::yield_now;
 
 use std::io;
 use std::{
