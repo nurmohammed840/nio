@@ -8,6 +8,7 @@ impl Runtime {
     pub fn new(core: usize) -> Runtime {
         Self(
             nio::RuntimeBuilder::new()
+                // .min_tasks_per_worker(8)
                 .measurement(SimpleMeasurement::new())
                 .worker_threads(core as u8)
                 .rt()
@@ -34,7 +35,10 @@ impl Runtime {
         F: Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        self.0.spawn(future)
+        #[cfg(feature = "pinned")]
+        return self.0.spawn_pinned(|| future);
+        #[cfg(not(feature = "pinned"))]
+        return self.0.spawn(future);
     }
 
     pub fn handle(&self) -> Arc<nio::RuntimeContext> {

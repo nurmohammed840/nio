@@ -7,6 +7,7 @@ license = "MIT"
 
 [features]
 tokio = []
+pinned = []
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
@@ -56,6 +57,11 @@ harness = false
 [[bench]]
 name = "sync_mpsc"
 path = "sync_mpsc.rs"
+harness = false
+
+[[bench]]
+name = "sync_notify"
+path = "sync_notify.rs"
 harness = false
 
 [[bench]]
