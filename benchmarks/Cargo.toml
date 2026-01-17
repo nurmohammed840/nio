@@ -15,24 +15,12 @@ nio = { path = "../libs/nio-rt", features = [] }
 nio-metrics = { path = "../libs/nio-metrics" }
 nio-future = { path = "../libs/nio-future" }
 futures = "*"
+
 criterion = "0.7"
+rand = "0.9"
+rand_chacha = "0.9"
 
 [dev-dependencies]
-
-[[bench]]
-name = "timer"
-path = "timer.rs"
-harness = false
-
-[[bench]]
-name = "spawn"
-path = "spawn.rs"
-harness = false
-
-[[bench]]
-name = "spawn_blocking"
-path = "spawn_blocking.rs"
-harness = false
 
 [[bench]]
 name = "rt_current_thread"
@@ -42,4 +30,35 @@ harness = false
 [[bench]]
 name = "rt_multi_threaded"
 path = "rt_multi_threaded.rs"
+harness = false
+
+[[bench]]
+name = "spawn_blocking"
+path = "spawn_blocking.rs"
+harness = false
+
+[[bench]]
+name = "spawn"
+path = "spawn.rs"
+harness = false
+
+
+[[bench]]
+name = "sync_broadcast"
+path = "sync_broadcast.rs"
+harness = false
+
+[[bench]]
+name = "sync_mpsc_oneshot"
+path = "sync_mpsc_oneshot.rs"
+harness = false
+
+[[bench]]
+name = "sync_mpsc"
+path = "sync_mpsc.rs"
+harness = false
+
+[[bench]]
+name = "timer"
+path = "timer.rs"
 harness = false
