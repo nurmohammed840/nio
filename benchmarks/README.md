@@ -16,4 +16,6 @@ cargo bench --bench rt_multi_threaded
 - `sync_mpsc_oneshot`
 - `sync_mpsc`
 - `sync_notify`
+- `sync_semaphore`
+- `sync_watch`
 - `timer`

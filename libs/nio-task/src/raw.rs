@@ -136,39 +136,37 @@ impl Header {
         if state.has(COMPLETE) {
             return true;
         }
-        let res = if !state.has(JOIN_WAKER) {
+        if !state.has(JOIN_WAKER) {
             // the task is not complete, try storing the provided waker in the task's waker field.
             // SAFETY: `JOIN_WAKER` is not set, see docs of `JOIN_WAKER` flag.
-            unsafe { self.set_join_waker(waker.clone()) }
-        } else {
-            // We need to replace it.
-            // Optimization: Avoid storing the waker, if it is the same as the current one.
+            return unsafe { self.set_join_waker(waker.clone()) };
+        }
+        // We need to replace it.
+        let is_complete = self.state.unset_waker();
+        if !is_complete {
             unsafe {
-                let old_waker = (*self.join_waker.get()).as_ref().unwrap();
-                if old_waker.will_wake(waker) {
-                    return false;
+                // Optimization: Avoid storing the waker, if it is the same as the current one.
+                let old = (*self.join_waker.get()).as_ref().unwrap();
+                if old.will_wake(waker) {
+                    return self.state.set_waker();
                 }
             }
-            self.state
-                .unset_waker()
-                // SAFETY: `JOIN_WAKER` unset successfully, we can set the new waker.
-                // We have the exclusive access to the waker field.
-                .and_then(|_| unsafe { self.set_join_waker(waker.clone()) })
-        };
-
-        res.is_err() // If Error, Task is `COMPLETE`
+            // SAFETY: `JOIN_WAKER` unset successfully, we can set the new waker.
+            // We have the exclusive access to the waker field.
+            unsafe { self.set_join_waker(waker.clone()) };
+        }
+        is_complete
     }
 
     /// This function return `Err(..)` If task is COMPLETE.
-    unsafe fn set_join_waker(&self, waker: Waker) -> Result<Snapshot, ()> {
+    unsafe fn set_join_waker(&self, waker: Waker) -> bool {
         // Safety: Only the `JoinHandle` may set the `waker` field. When
         // `JOIN_INTEREST` is **not** set, nothing else will touch the field.
         *self.join_waker.get() = Some(waker);
-        let res = self.state.set_waker();
-        // If the state could not be updated, then clear the join waker
-        if res.is_err() {
+        let is_complete = self.state.set_waker();
+        if is_complete {
             *self.join_waker.get() = None;
         }
-        res
+        is_complete
     }
 }
