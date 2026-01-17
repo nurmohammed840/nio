@@ -43,8 +43,6 @@ pub const JOIN_INTEREST: usize = 1 << 4;
 /// This flag represents ownership of the waker stored in [`crate::raw::Header::join_waker`] field.
 pub const JOIN_WAKER: usize = 1 << 5;
 
-pub type UpdateResult = Result<Snapshot, ()>;
-
 pub struct State(AtomicUsize);
 
 impl State {
@@ -106,7 +104,8 @@ impl State {
         .is_err()
     }
 
-    pub fn set_waker(&self) -> UpdateResult {
+    /// Return `true` if task has `COMPLETE`
+    pub fn set_waker(&self) -> bool {
         self.fetch_update(|state| {
             debug_assert!(!state.has(JOIN_WAKER));
 
@@ -115,9 +114,11 @@ impl State {
             }
             Ok(state.with(JOIN_WAKER))
         })
+        .is_err()
     }
 
-    pub fn unset_waker(&self) -> UpdateResult {
+    /// Return `true` if task has `COMPLETE`
+    pub fn unset_waker(&self) -> bool {
         self.fetch_update(|state| {
             debug_assert!(state.has(JOIN_WAKER));
 
@@ -126,6 +127,7 @@ impl State {
             }
             Ok(state.remove(JOIN_WAKER))
         })
+        .is_err()
     }
 }
 
