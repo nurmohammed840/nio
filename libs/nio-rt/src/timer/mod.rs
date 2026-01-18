@@ -84,10 +84,8 @@ impl RcTimer {
 
     #[inline]
     fn clone(&self) -> RcTimer {
-        self.as_ref().rc.update(|rc| {
-            assert_eq!(rc, 1);
-            2
-        });
+        debug_assert_eq!(self.as_ref().rc.get(), 1);
+        self.as_ref().rc.set(2);
         RcTimer::from_inner(self.ptr)
     }
 
@@ -118,7 +116,6 @@ impl Drop for RcTimer {
 struct Timer {
     rc: Cell<u8>,
     deadline: Cell<Instant>,
-    notified: Cell<bool>,
     waker: LocalWaker,
 }
 
@@ -127,7 +124,6 @@ impl Timer {
         Self {
             rc: Cell::new(2),
             deadline: Cell::new(deadline),
-            notified: Cell::new(false),
             waker: LocalWaker::new(),
         }
     }
@@ -198,7 +194,6 @@ impl Elapsed {
                 // Other half is droped
                 return;
             }
-            timer.notified.set(true);
             timer.waker.wake();
         }
     }
@@ -226,7 +221,7 @@ impl fmt::Debug for Timer {
         let deadline = self.deadline.get().checked_duration_since(Instant::now());
         f.debug_struct("Timer")
             .field("deadline", &deadline)
-            .field("state", &self.notified.get())
+            .field("state", &self.rc.get())
             .finish()
     }
 }

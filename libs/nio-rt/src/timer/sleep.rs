@@ -22,7 +22,7 @@ impl Sleep {
 
     #[inline]
     pub fn is_elapsed(&self) -> bool {
-        self.timer.as_ref().notified.get()
+        self.timer.as_ref().rc.get() == 1
     }
 
     pub fn reset_at(&mut self, deadline: Instant) {

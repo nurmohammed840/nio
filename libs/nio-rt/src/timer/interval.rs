@@ -41,7 +41,6 @@ impl Interval {
 
         if self.delay.is_elapsed() {
             let timer = self.delay.timer.clone();
-            timer.as_ref().notified.set(false);
 
             LocalContext::with(|ctx| unsafe {
                 ctx.timers(|timers| {
