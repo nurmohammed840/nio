@@ -29,6 +29,9 @@ jobs:
     - name: Run miri
       run: cargo +nightly miri nextest run --no-fail-fast
 
+    - name: Run clippy
+      run: cargo clippy
+
     - name: Run doc test
       run: cargo test --doc
 

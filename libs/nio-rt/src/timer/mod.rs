@@ -189,12 +189,7 @@ impl Elapsed {
     /// [`crate::LocalContext::add_task_to_local_queue`]
     pub fn notify_all(self) {
         for (entry, _) in self.entries {
-            let timer = entry.as_ref();
-            if timer.rc.get() == 1 {
-                // Other half is droped
-                return;
-            }
-            timer.waker.wake();
+            entry.as_ref().waker.wake();
         }
     }
 }

@@ -38,6 +38,7 @@ impl IoWaker {
     }
 
     #[inline]
+    #[allow(clippy::borrowed_box)]
     pub fn addr(self: &Box<Self>) -> usize {
         let ptr = &raw const **self;
         ptr.expose_provenance()
@@ -66,7 +67,7 @@ impl IoWaker {
     pub fn notify(&self, ev: &mio::event::Event) {
         let mut readiness: u8 = self.readiness.get();
 
-        #[cfg(all(target_os = "freebsd"))]
+        #[cfg(target_os = "freebsd")]
         {
             if ev.is_aio() {
                 readiness |= Readiness::READABLE;
