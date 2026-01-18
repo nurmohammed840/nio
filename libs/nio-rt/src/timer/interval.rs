@@ -37,14 +37,15 @@ impl Interval {
     }
 
     pub fn poll(&mut self, cx: &mut Context<'_>) -> Poll<()> {
-        self.delay.timer.waker.register(cx);
+        self.delay.timer.as_ref().waker.register(cx);
 
         if self.delay.is_elapsed() {
             let timer = self.delay.timer.clone();
+            timer.as_ref().notified.set(false);
+
             LocalContext::with(|ctx| unsafe {
                 ctx.timers(|timers| {
-                    timer.notified.set(false);
-                    timer.deadline.set(timers.clock.current() + self.period);
+                    timer.set_deadline(timers.clock.current() + self.period);
                     timers.insert_entry(timer)
                 })
             });

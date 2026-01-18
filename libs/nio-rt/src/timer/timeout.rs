@@ -59,7 +59,7 @@ impl<Fut: Future> Future for Timeout<Fut> {
                 if this.delay.is_elapsed() {
                     return Poll::Ready(None);
                 }
-                this.delay.timer.waker.register(cx);
+                this.delay.timer.as_ref().waker.register(cx);
                 Poll::Pending
             }
         }

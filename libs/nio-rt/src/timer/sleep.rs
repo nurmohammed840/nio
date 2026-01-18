@@ -7,7 +7,7 @@ use std::{
 };
 
 pub struct Sleep {
-    pub(crate) timer: Rc<Timer>,
+    pub(crate) timer: RcTimer,
 }
 
 impl Sleep {
@@ -17,12 +17,12 @@ impl Sleep {
 
     #[inline]
     pub fn deadline(&self) -> Instant {
-        self.timer.deadline.get()
+        self.timer.deadline()
     }
 
     #[inline]
     pub fn is_elapsed(&self) -> bool {
-        self.timer.notified.get()
+        self.timer.as_ref().notified.get()
     }
 
     pub fn reset_at(&mut self, deadline: Instant) {
@@ -52,7 +52,7 @@ impl Future for Sleep {
         if self.is_elapsed() {
             return Poll::Ready(());
         }
-        self.timer.waker.register(cx);
+        self.timer.as_ref().waker.register(cx);
         Poll::Pending
     }
 }
@@ -68,6 +68,6 @@ impl Drop for Sleep {
 
 impl fmt::Debug for Sleep {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(&self.timer, f)
+        fmt::Debug::fmt(self.timer.as_ref(), f)
     }
 }
