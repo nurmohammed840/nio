@@ -1,5 +1,4 @@
 use crate::raw::{Fut, Header, PollStatus, RawTask, RawTaskVTable};
-use crate::waker::NOOP_WAKER;
 use crate::{JoinError, JoinHandle, TaskId};
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
@@ -29,7 +28,7 @@ impl BlockingTask {
     }
 
     pub fn run(self) {
-        unsafe { self.raw.poll(&NOOP_WAKER) };
+        unsafe { self.raw.poll(Waker::noop()) };
     }
 
     #[inline]
@@ -55,7 +54,7 @@ where
     }
 
     fn waker(self: Arc<Self>) -> Waker {
-        NOOP_WAKER
+        unreachable!()
     }
 
     unsafe fn metadata(&self) -> *mut () {

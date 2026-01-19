@@ -43,12 +43,47 @@ pub const JOIN_INTEREST: usize = 1 << 4;
 /// This flag represents ownership of the waker stored in [`crate::raw::Header::join_waker`] field.
 pub const JOIN_WAKER: usize = 1 << 5;
 
+// ------------- ARC -------------
+
+// pub const REF_COUNT_SHIFT: u8 = 6;
+// pub const REF_ONE: usize = 1 << REF_COUNT_SHIFT;
+// /// 2 ref-count for JoinHandle and Task
+// pub const REF_TWO: usize = 2 * REF_ONE;
+
 pub struct State(AtomicUsize);
 
 impl State {
     pub fn new() -> Self {
-        Self(AtomicUsize::new(NOTIFIED | JOIN_INTEREST))
+        // Self(AtomicUsize::new(REF_TWO | JOIN_INTEREST | NOTIFIED))
+        Self(AtomicUsize::new(JOIN_INTEREST | NOTIFIED))
     }
+
+    // #[inline]
+    // pub fn inc_ref(&self) {
+    //     // Using a relaxed ordering is alright here, as knowledge of the
+    //     // original reference prevents other threads from erroneously deleting
+    //     // the object.
+    //     //
+    //     // As explained in the [Boost documentation][1], Increasing the
+    //     // reference counter can always be done with memory_order_relaxed: New
+    //     // references to an object can only be formed from an existing
+    //     // reference, and passing an existing reference from one thread to
+    //     // another must already provide any required synchronization.
+    //     //
+    //     // [1]: (www.boost.org/doc/libs/1_55_0/doc/html/atomic/usage_examples.html)
+    //     let prev = self.0.fetch_add(REF_ONE, Ordering::Relaxed);
+    //     if prev > isize::MAX as usize {
+    //         std::process::abort();
+    //     }
+    // }
+
+    // #[inline]
+    // /// Returns `true` if the task should be released.
+    // pub fn ref_dec(&self) -> bool {
+    //     let prev = Snapshot(self.0.fetch_sub(REF_ONE, AcqRel));
+    //     debug_assert!(prev.ref_count() >= 1);
+    //     prev.ref_count() == 1
+    // }
 
     pub fn load(&self) -> Snapshot {
         Snapshot(self.0.load(Acquire))
@@ -136,19 +171,23 @@ impl State {
 pub struct Snapshot(usize);
 
 impl Snapshot {
-    pub fn is(&self, state: usize) -> bool {
+    // fn ref_count(self) -> usize {
+    //     self.0 >> REF_COUNT_SHIFT
+    // }
+
+    pub fn is(self, state: usize) -> bool {
         self.0 & 0b_11 == state
     }
 
-    pub fn has(&self, flag: usize) -> bool {
+    pub fn has(self, flag: usize) -> bool {
         self.0 & flag == flag
     }
 
-    pub fn with(&self, flag: usize) -> Snapshot {
+    pub fn with(self, flag: usize) -> Snapshot {
         Self(self.0 | flag)
     }
 
-    fn remove(&self, flag: usize) -> Snapshot {
+    fn remove(self, flag: usize) -> Snapshot {
         Self(self.0 & !flag)
     }
 }

@@ -8,7 +8,8 @@ mod id;
 mod join;
 mod raw;
 mod state;
-mod waker;
+// mod waker;
+// mod thin_arc;
 
 use crate::raw::*;
 
