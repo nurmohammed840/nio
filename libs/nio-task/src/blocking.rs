@@ -1,9 +1,10 @@
 use crate::raw::{Fut, Header, PollStatus, RawTask, RawTaskHeader, RawTaskVTable};
+use crate::thin_arc::ThinArc;
 use crate::{JoinError, JoinHandle, TaskId};
 
+use std::cell::UnsafeCell;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::task::{Poll, Waker};
-use std::{cell::UnsafeCell, sync::Arc};
 use std::{fmt, panic};
 
 pub struct BlockingTask {
@@ -19,13 +20,13 @@ impl BlockingTask {
         F: FnOnce() -> T + Send + 'static,
         T: Send + 'static,
     {
-        let raw = Arc::new(RawTaskHeader {
+        let (raw, join) = ThinArc::new(Box::new(RawTaskHeader {
             header: Header::new(),
             data: BlockingRawTask {
                 func: UnsafeCell::new(Fut::Future(f)),
             },
-        });
-        (BlockingTask { raw: raw.clone() }, JoinHandle::new(raw))
+        }));
+        (BlockingTask { raw }, JoinHandle::new(join))
     }
 
     pub fn run(self) {
@@ -47,11 +48,7 @@ where
     F: FnOnce() -> T + Send + 'static,
     T: Send + 'static,
 {
-    fn header(&self) -> &Header {
-        &self.header
-    }
-
-    fn waker(self: Arc<Self>) -> Waker {
+    fn waker(&self, _: RawTask) -> Waker {
         unreachable!()
     }
 

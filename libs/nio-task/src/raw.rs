@@ -1,5 +1,5 @@
-use crate::{JoinError, state::*};
-use std::{cell::UnsafeCell, mem, sync::Arc, task::Waker};
+use crate::{JoinError, state::*, thin_arc::ThinArc};
+use std::{cell::UnsafeCell, mem, task::Waker};
 
 pub enum Fut<F, T> {
     Future(F),
@@ -43,11 +43,10 @@ pub struct RawTaskHeader<Data: ?Sized> {
 unsafe impl<Data> Send for RawTaskHeader<Data> {}
 unsafe impl<Data> Sync for RawTaskHeader<Data> {}
 
-pub type RawTask = Arc<dyn RawTaskVTable>;
+pub type RawTask = ThinArc<dyn RawTaskVTable>;
 
 pub trait RawTaskVTable {
-    fn header(&self) -> &Header;
-    fn waker(self: Arc<Self>) -> Waker;
+    fn waker(&self, raw: RawTask) -> Waker;
 
     unsafe fn metadata(&self) -> *mut ();
 

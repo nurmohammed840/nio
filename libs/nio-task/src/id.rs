@@ -1,13 +1,14 @@
-use std::{fmt, future::poll_fn, num::NonZero, sync::Arc, task::Poll};
+use std::{fmt, future::poll_fn, num::NonZero, task::Poll};
 
 use super::raw::RawTask;
+use crate::thin_arc::ThinArc;
 
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
 pub struct TaskId(pub(crate) NonZero<usize>);
 
 impl TaskId {
     pub(super) fn new(task: &RawTask) -> TaskId {
-        TaskId(unsafe { NonZero::new_unchecked(Arc::as_ptr(task).addr()) })
+        TaskId(unsafe { NonZero::new_unchecked(ThinArc::as_ptr(task).addr()) })
     }
 
     #[inline]

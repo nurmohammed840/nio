@@ -2,13 +2,14 @@ use std::{
     cell::UnsafeCell,
     panic::{AssertUnwindSafe, catch_unwind},
     pin::Pin,
-    sync::Arc,
     task::{Context, Poll, Waker},
 };
 
 use crate::{
     JoinError, Scheduler, Task,
-    raw::{Fut, Header, PollStatus, RawTask, RawTaskHeader, RawTaskVTable},
+    raw::{Fut, PollStatus, RawTask, RawTaskHeader, RawTaskVTable},
+    thin_arc::ThinArc,
+    waker::ArcWaker,
 };
 
 pub struct RawTaskInner<F: Future, S: Scheduler<M>, M> {
@@ -17,7 +18,6 @@ pub struct RawTaskInner<F: Future, S: Scheduler<M>, M> {
     pub scheduler: S,
 }
 
-
 impl<F, S, M> RawTaskVTable for RawTaskHeader<RawTaskInner<F, S, M>>
 where
     M: 'static,
@@ -25,13 +25,10 @@ where
     S: Scheduler<M>,
 {
     #[inline]
-    fn waker(self: Arc<Self>) -> Waker {
-        Waker::from(self)
-    }
-
-    #[inline]
-    fn header(&self) -> &Header {
-        &self.header
+    fn waker(&self, raw: RawTask) -> Waker {
+        // SAFETY: stable rust doesn't support `self: ThinArc<Self>`, so we manually convert it.
+        let this: ThinArc<Self> = unsafe { ThinArc::concrete(raw) };
+        crate::waker::waker_from(this)
     }
 
     unsafe fn metadata(&self) -> *mut () {
@@ -141,29 +138,31 @@ where
     F: Future + 'static,
     S: Scheduler<M>,
 {
-    unsafe fn schedule_by_ref(self: &Arc<Self>) {
-        self.data.scheduler.schedule(Task::from_raw(self.clone()));
+    unsafe fn schedule_by_ref(this: &ThinArc<Self>) {
+        this.data
+            .scheduler
+            .schedule(Task::from_raw(ThinArc::erase(this.clone())));
     }
 }
 
-impl<F, S, M> std::task::Wake for RawTaskHeader<RawTaskInner<F, S, M>>
+impl<F, S, M> ArcWaker for RawTaskHeader<RawTaskInner<F, S, M>>
 where
     M: 'static,
     F: Future + 'static,
     S: Scheduler<M>,
 {
-    fn wake(self: Arc<Self>) {
+    fn wake(this: ThinArc<Self>) {
         unsafe {
-            if self.header.transition_to_notified() {
-                Self::schedule_by_ref(&self);
+            if this.header.transition_to_notified() {
+                Self::schedule_by_ref(&this);
             }
         }
     }
 
-    fn wake_by_ref(self: &Arc<Self>) {
+    fn wake_by_ref(this: &ThinArc<Self>) {
         unsafe {
-            if self.header.transition_to_notified() {
-                Self::schedule_by_ref(self);
+            if this.header.transition_to_notified() {
+                Self::schedule_by_ref(this);
             }
         }
     }

@@ -1,4 +1,3 @@
-#![allow(warnings)]
 use crate::raw::{Header, RawTaskHeader, RawTaskVTable};
 use std::{marker::PhantomData, mem::ManuallyDrop, ptr::NonNull};
 

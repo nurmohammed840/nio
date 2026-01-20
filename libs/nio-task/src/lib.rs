@@ -9,10 +9,10 @@ mod join;
 mod raw;
 mod state;
 mod task;
-mod waker;
 mod thin_arc;
+mod waker;
 
-use crate::raw::*;
+use crate::{raw::*, thin_arc::ThinArc};
 
 pub use abort::AbortHandle;
 pub use blocking::BlockingTask;
@@ -27,7 +27,6 @@ use std::{
     future::Future,
     marker::PhantomData,
     mem::ManuallyDrop,
-    sync::Arc,
 };
 
 pub trait Scheduler<M = ()>: 'static {
@@ -151,15 +150,15 @@ impl<M> Task<M> {
         S: Scheduler<M>,
         F: Future + 'static,
     {
-        let raw = Arc::new(RawTaskHeader {
+        let (raw, join) = ThinArc::new(Box::new(RawTaskHeader {
             header: Header::new(),
             data: task::RawTaskInner {
                 future: UnsafeCell::new(Fut::Future(future)),
                 meta: UnsafeCell::new(meta),
                 scheduler,
             },
-        });
-        (Task::from_raw(raw.clone()), JoinHandle::new(raw))
+        }));
+        (Task::from_raw(raw), JoinHandle::new(join))
     }
 
     pub fn new_with<F, S>(meta: M, future: F, scheduler: S) -> (Task<M>, JoinHandle<F::Output>)
@@ -240,18 +239,18 @@ impl<M> Task<M> {
 
     #[inline]
     pub fn poll(mut self) -> Status<M> {
-        let inner = unsafe { self.raw.take().unwrap_unchecked() };
+        let raw = unsafe { self.raw.take().unwrap_unchecked() };
         // Don't increase ref-counter
-        let raw = unsafe { Arc::from_raw(Arc::as_ptr(&inner)) };
+        let waker = raw.clone_without_ref_inc();
         // Don't decrease ref-counter
-        let waker = ManuallyDrop::new(raw.waker());
+        let waker = ManuallyDrop::new(raw.waker(waker));
 
         // SAFETY: `Task` does not implement `Clone` and we have owned access
-        match unsafe { inner.poll(&waker) } {
-            PollStatus::Yield => Status::Yielded(Task::from_raw(inner)),
+        match unsafe { raw.poll(&waker) } {
+            PollStatus::Yield => Status::Yielded(Task::from_raw(raw)),
             PollStatus::Pending => Status::Pending,
             PollStatus::Complete => Status::Complete(Metadata {
-                raw: inner,
+                raw,
                 _meta: PhantomData,
             }),
         }
