@@ -4,20 +4,16 @@ use super::{COMPLETE, RawTask, id::TaskId};
 
 #[derive(Clone)]
 pub struct AbortHandle {
-    raw: RawTask,
+    pub(super) raw: RawTask,
 }
 
 unsafe impl Send for AbortHandle {}
 unsafe impl Sync for AbortHandle {}
 
 impl AbortHandle {
-    pub(super) fn new(raw: RawTask) -> Self {
-        Self { raw }
-    }
-
-    pub fn abort(self) {
+    pub fn abort(&self) {
         unsafe {
-            self.raw.abort_task();
+            self.raw.abort_task(self.raw.clone());
         }
     }
 

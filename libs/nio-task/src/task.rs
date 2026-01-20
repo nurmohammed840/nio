@@ -8,7 +8,7 @@ use std::{
 
 use crate::{
     JoinError, Scheduler, Task,
-    raw::{Fut, Header, PollStatus, RawTaskHeader, RawTaskVTable},
+    raw::{Fut, Header, PollStatus, RawTask, RawTaskHeader, RawTaskVTable},
 };
 
 pub struct RawTaskInner<F: Future, S: Scheduler<M>, M> {
@@ -88,11 +88,11 @@ where
         PollStatus::Complete
     }
 
-    unsafe fn schedule(self: Arc<Self>) {
-        self.data.scheduler.schedule(Task::from_raw(self.clone()));
+    unsafe fn schedule(&self, raw: RawTask) {
+        self.data.scheduler.schedule(Task::from_raw(raw));
     }
 
-    unsafe fn drop_task(self: Arc<Self>) {
+    unsafe fn drop_task(&self) {
         // TODO: Also drop task metadata.
 
         let may_panic = catch_unwind(AssertUnwindSafe(|| {
@@ -109,9 +109,9 @@ where
         }
     }
 
-    unsafe fn abort_task(self: Arc<Self>) {
+    unsafe fn abort_task(&self, raw: RawTask) {
         if self.header.transition_to_abort() {
-            self.schedule()
+            self.schedule(raw)
         }
     }
 

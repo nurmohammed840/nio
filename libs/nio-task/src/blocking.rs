@@ -103,9 +103,9 @@ where
         }
     }
 
-    unsafe fn abort_task(self: Arc<Self>) {}
-    unsafe fn schedule(self: Arc<Self>) {}
-    unsafe fn drop_task(self: Arc<Self>) {}
+    unsafe fn schedule(&self, _: RawTask) {}
+    unsafe fn abort_task(&self, _: RawTask) {}
+    unsafe fn drop_task(&self) {}
 }
 
 impl fmt::Debug for BlockingTask {

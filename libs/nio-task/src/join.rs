@@ -28,11 +28,13 @@ impl<T> JoinHandle<T> {
     }
 
     pub fn abort_handle(&self) -> AbortHandle {
-        AbortHandle::new(self.raw.clone())
+        AbortHandle {
+            raw: self.raw.clone(),
+        }
     }
 
-    pub fn abort(self) {
-        unsafe { self.raw.clone().abort_task() };
+    pub fn abort(&self) {
+        unsafe { self.raw.abort_task(self.raw.clone()) };
     }
 
     pub fn is_finished(&self) -> bool {

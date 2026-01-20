@@ -52,15 +52,16 @@ pub trait RawTaskVTable {
     unsafe fn metadata(&self) -> *mut ();
 
     unsafe fn poll(&self, waker: &Waker) -> PollStatus;
-    unsafe fn schedule(self: Arc<Self>);
-    unsafe fn drop_task(self: Arc<Self>);
+    unsafe fn schedule(&self, raw: RawTask);
+    unsafe fn drop_task(&self);
 
-    unsafe fn abort_task(self: Arc<Self>);
+    unsafe fn abort_task(&self, raw: RawTask);
     /// `dst: &mut Poll<Result<Future::Output, JoinError>>`
     unsafe fn read_output(&self, dst: *mut (), waker: &Waker);
     unsafe fn drop_join_handler(&self);
 }
 
+#[repr(C)]
 pub struct Header {
     pub state: State,
     pub join_waker: UnsafeCell<Option<Waker>>,

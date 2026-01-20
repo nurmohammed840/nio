@@ -259,7 +259,10 @@ impl<M> Task<M> {
 
     #[inline]
     pub fn schedule(mut self) {
-        unsafe { self.raw.take().unwrap_unchecked().schedule() }
+        unsafe {
+            let raw = self.raw.take().unwrap_unchecked();
+            raw.schedule(raw.clone());
+        }
     }
 
     #[inline]
