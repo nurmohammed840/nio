@@ -1,5 +1,5 @@
 #![allow(warnings)]
-use crate::raw::{Header, RawTaskVTable};
+use crate::raw::{Header, RawTaskHeader, RawTaskVTable};
 use std::{marker::PhantomData, mem::ManuallyDrop, ptr::NonNull};
 
 pub struct ThinArc<Data: ?Sized> {
@@ -13,8 +13,11 @@ unsafe impl<T: ?Sized + Sync + Send> Sync for ThinArc<T> {}
 
 impl ThinArc<dyn RawTaskVTable> {
     #[inline]
-    pub fn new(this: Box<dyn RawTaskVTable>) -> (Self, Self) {
-        let ptr = NonNull::from(Box::leak(this));
+    pub fn new<Data>(this: Box<RawTaskHeader<Data>>) -> (Self, Self)
+    where
+        RawTaskHeader<Data>: RawTaskVTable + 'static,
+    {
+        let ptr: NonNull<dyn RawTaskVTable + 'static> = NonNull::from(Box::leak(this));
         unsafe { (ThinArc::from_inner(ptr), ThinArc::from_inner(ptr)) }
     }
 }
@@ -58,11 +61,16 @@ impl<Data: ?Sized> ThinArc<Data> {
 }
 
 impl<T: RawTaskVTable + 'static> ThinArc<T> {
+    /// We need to manually impl `erase`
+    /// as we can't impl `CoerceUnsized` on stable rust
+    ///
+    /// https://doc.rust-lang.org/std/ops/trait.CoerceUnsized.html
     pub fn erase(this: ThinArc<T>) -> ThinArc<dyn RawTaskVTable> {
         let this = ManuallyDrop::new(this);
         unsafe { ThinArc::from_inner(this.ptr) }
     }
 
+    // same as: https://doc.rust-lang.org/std/sync/struct.Arc.html#method.downcast_unchecked
     pub unsafe fn concrete(this: ThinArc<dyn RawTaskVTable>) -> ThinArc<T> {
         let this = ManuallyDrop::new(this);
         unsafe { ThinArc::from_inner(this.ptr.cast()) }
@@ -78,19 +86,19 @@ impl<T: ?Sized> std::ops::Deref for ThinArc<T> {
     }
 }
 
-// impl<Data: ?Sized> Clone for ThinArc<Data> {
-//     #[inline]
-//     fn clone(&self) -> Self {
-//         self.header().state.inc_ref();
-//         ThinArc::from_inner(self.ptr)
-//     }
-// }
+impl<Data: ?Sized> Clone for ThinArc<Data> {
+    #[inline]
+    fn clone(&self) -> Self {
+        self.header().state.inc_ref();
+        unsafe { ThinArc::from_inner(self.ptr) }
+    }
+}
 
-// impl<Data: ?Sized> Drop for ThinArc<Data> {
-//     #[inline]
-//     fn drop(&mut self) {
-//         if self.header().state.ref_dec() {
-//             unsafe { self.drop_slow() };
-//         }
-//     }
-// }
+impl<Data: ?Sized> Drop for ThinArc<Data> {
+    #[inline]
+    fn drop(&mut self) {
+        if self.header().state.ref_dec() {
+            unsafe { self.drop_slow() };
+        }
+    }
+}

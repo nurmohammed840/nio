@@ -9,8 +9,8 @@ mod join;
 mod raw;
 mod state;
 mod task;
-// mod waker;
-// mod thin_arc;
+mod waker;
+mod thin_arc;
 
 use crate::raw::*;
 
