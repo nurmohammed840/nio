@@ -1,7 +1,6 @@
 use crate::{JoinError, state::*};
 use std::{cell::UnsafeCell, mem, sync::Arc, task::Waker};
 
-#[repr(C)] // https://github.com/rust-lang/miri/issues/3780
 pub enum Fut<F, T> {
     Future(F),
     Output(Result<T, JoinError>),
@@ -34,6 +33,15 @@ impl<F, T> Fut<F, T> {
         }
     }
 }
+
+#[repr(C)]
+pub struct RawTaskHeader<Data: ?Sized> {
+    pub header: Header,
+    pub data: Data,
+}
+
+unsafe impl<Data> Send for RawTaskHeader<Data> {}
+unsafe impl<Data> Sync for RawTaskHeader<Data> {}
 
 pub type RawTask = Arc<dyn RawTaskVTable>;
 

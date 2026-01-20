@@ -117,6 +117,13 @@ impl Task {
 }
 
 impl<M> Task<M> {
+    pub(crate) fn from_raw(raw: RawTask) -> Self {
+        Self {
+            raw: Some(raw),
+            _meta: PhantomData,
+        }
+    }
+
     pub fn metadata(&self) -> &M {
         unsafe {
             &*(self.raw.as_ref().unwrap_unchecked())
@@ -144,19 +151,15 @@ impl<M> Task<M> {
         S: Scheduler<M>,
         F: Future + 'static,
     {
-        let raw = Arc::new(task::RawTaskInner {
+        let raw = Arc::new(RawTaskHeader {
             header: Header::new(),
-            future: UnsafeCell::new(Fut::Future(future)),
-            meta: UnsafeCell::new(meta),
-            scheduler,
-        });
-        (
-            Self {
-                raw: Some(raw.clone()),
-                _meta: PhantomData,
+            data: task::RawTaskInner {
+                future: UnsafeCell::new(Fut::Future(future)),
+                meta: UnsafeCell::new(meta),
+                scheduler,
             },
-            JoinHandle::new(raw),
-        )
+        });
+        (Task::from_raw(raw.clone()), JoinHandle::new(raw))
     }
 
     pub fn new_with<F, S>(meta: M, future: F, scheduler: S) -> (Task<M>, JoinHandle<F::Output>)
@@ -245,10 +248,7 @@ impl<M> Task<M> {
 
         // SAFETY: `Task` does not implement `Clone` and we have owned access
         match unsafe { inner.poll(&waker) } {
-            PollStatus::Yield => Status::Yielded(Self {
-                raw: Some(inner),
-                _meta: PhantomData,
-            }),
+            PollStatus::Yield => Status::Yielded(Task::from_raw(inner)),
             PollStatus::Pending => Status::Pending,
             PollStatus::Complete => Status::Complete(Metadata {
                 raw: inner,

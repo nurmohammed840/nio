@@ -1,6 +1,5 @@
 use std::{
     cell::UnsafeCell,
-    marker::PhantomData,
     panic::{AssertUnwindSafe, catch_unwind},
     pin::Pin,
     sync::Arc,
@@ -9,20 +8,17 @@ use std::{
 
 use crate::{
     JoinError, Scheduler, Task,
-    raw::{Fut, Header, PollStatus, RawTaskVTable},
+    raw::{Fut, Header, PollStatus, RawTaskHeader, RawTaskVTable},
 };
 
 pub struct RawTaskInner<F: Future, S: Scheduler<M>, M> {
-    pub header: Header,
     pub future: UnsafeCell<Fut<F, F::Output>>,
     pub meta: UnsafeCell<M>,
     pub scheduler: S,
 }
 
-unsafe impl<F: Future, S: Scheduler<M>, M> Send for RawTaskInner<F, S, M> {}
-unsafe impl<F: Future, S: Scheduler<M>, M> Sync for RawTaskInner<F, S, M> {}
 
-impl<F, S, M> RawTaskVTable for RawTaskInner<F, S, M>
+impl<F, S, M> RawTaskVTable for RawTaskHeader<RawTaskInner<F, S, M>>
 where
     M: 'static,
     F: Future + 'static,
@@ -39,7 +35,7 @@ where
     }
 
     unsafe fn metadata(&self) -> *mut () {
-        self.meta.get().cast()
+        self.data.meta.get().cast()
     }
 
     /// State transitions:
@@ -55,7 +51,7 @@ where
                 Err(JoinError::cancelled())
             } else {
                 let poll_result = unsafe {
-                    let fut = match &mut *self.future.get() {
+                    let fut = match &mut *self.data.future.get() {
                         Fut::Future(fut) => Pin::new_unchecked(fut),
                         _ => unreachable!(),
                     };
@@ -69,7 +65,7 @@ where
             };
             // Droping `Fut::Future` may also panic, but we catch it in outer layer
             unsafe {
-                (*self.future.get()).set_output(result);
+                (*self.data.future.get()).set_output(result);
             }
             true
         }));
@@ -77,7 +73,7 @@ where
         match has_output {
             Ok(false) => return self.header.transition_to_sleep(),
             Ok(true) => {}
-            Err(err) => unsafe { (*self.future.get()).set_output(Err(JoinError::panic(err))) },
+            Err(err) => unsafe { (*self.data.future.get()).set_output(Err(JoinError::panic(err))) },
         }
         if !self
             .header
@@ -85,32 +81,31 @@ where
         {
             // Receiver is not interested in the output, So we can drop it.
             // Droping `Fut::Output` may panic
-            let _ = catch_unwind(AssertUnwindSafe(|| unsafe { (*self.future.get()).drop() }));
+            let _ = catch_unwind(AssertUnwindSafe(|| unsafe {
+                (*self.data.future.get()).drop()
+            }));
         }
         PollStatus::Complete
     }
 
     unsafe fn schedule(self: Arc<Self>) {
-        self.scheduler.schedule(Task {
-            raw: Some(self.clone()),
-            _meta: PhantomData,
-        });
+        self.data.scheduler.schedule(Task::from_raw(self.clone()));
     }
 
     unsafe fn drop_task(self: Arc<Self>) {
         // TODO: Also drop task metadata.
 
         let may_panic = catch_unwind(AssertUnwindSafe(|| {
-            (*self.future.get()).set_output(Err(JoinError::cancelled()));
+            (*self.data.future.get()).set_output(Err(JoinError::cancelled()));
         }));
         if let Err(panic) = may_panic {
-            (*self.future.get()).set_output(Err(JoinError::panic(panic)));
+            (*self.data.future.get()).set_output(Err(JoinError::panic(panic)));
         }
         if !self
             .header
             .transition_to_complete_and_notify_output_if_intrested()
         {
-            unsafe { (*self.future.get()).drop() }
+            unsafe { (*self.data.future.get()).drop() }
         }
     }
 
@@ -122,7 +117,7 @@ where
 
     unsafe fn read_output(&self, dst: *mut (), waker: &Waker) {
         if self.header.can_read_output_or_notify_when_readable(waker) {
-            *(dst as *mut _) = Poll::Ready((*self.future.get()).take_output());
+            *(dst as *mut _) = Poll::Ready((*self.data.future.get()).take_output());
         }
     }
 
@@ -132,7 +127,7 @@ where
             // If the task is complete then waker is droped by the executor.
             // We just only need to drop the output.
             let _ = catch_unwind(AssertUnwindSafe(|| unsafe {
-                (*self.future.get()).drop();
+                (*self.data.future.get()).drop();
             }));
         } else {
             *self.header.join_waker.get() = None;
@@ -140,21 +135,18 @@ where
     }
 }
 
-impl<F, S, M> RawTaskInner<F, S, M>
+impl<F, S, M> RawTaskHeader<RawTaskInner<F, S, M>>
 where
     M: 'static,
     F: Future + 'static,
     S: Scheduler<M>,
 {
     unsafe fn schedule_by_ref(self: &Arc<Self>) {
-        self.scheduler.schedule(Task {
-            raw: Some(self.clone()),
-            _meta: PhantomData,
-        });
+        self.data.scheduler.schedule(Task::from_raw(self.clone()));
     }
 }
 
-impl<F, S, M> std::task::Wake for RawTaskInner<F, S, M>
+impl<F, S, M> std::task::Wake for RawTaskHeader<RawTaskInner<F, S, M>>
 where
     M: 'static,
     F: Future + 'static,
@@ -163,7 +155,7 @@ where
     fn wake(self: Arc<Self>) {
         unsafe {
             if self.header.transition_to_notified() {
-                self.schedule();
+                Self::schedule_by_ref(&self);
             }
         }
     }
@@ -171,7 +163,7 @@ where
     fn wake_by_ref(self: &Arc<Self>) {
         unsafe {
             if self.header.transition_to_notified() {
-                self.schedule_by_ref();
+                Self::schedule_by_ref(self);
             }
         }
     }

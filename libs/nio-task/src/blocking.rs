@@ -1,4 +1,4 @@
-use crate::raw::{Fut, Header, PollStatus, RawTask, RawTaskVTable};
+use crate::raw::{Fut, Header, PollStatus, RawTask, RawTaskHeader, RawTaskVTable};
 use crate::{JoinError, JoinHandle, TaskId};
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
@@ -19,12 +19,13 @@ impl BlockingTask {
         F: FnOnce() -> T + Send + 'static,
         T: Send + 'static,
     {
-        let raw = Arc::new(BlockingRawTask {
+        let raw = Arc::new(RawTaskHeader {
             header: Header::new(),
-            func: UnsafeCell::new(Fut::Future(f)),
+            data: BlockingRawTask {
+                func: UnsafeCell::new(Fut::Future(f)),
+            },
         });
-        let join = JoinHandle::new(raw.clone());
-        (BlockingTask { raw }, join)
+        (BlockingTask { raw: raw.clone() }, JoinHandle::new(raw))
     }
 
     pub fn run(self) {
@@ -38,13 +39,10 @@ impl BlockingTask {
 }
 
 pub struct BlockingRawTask<F, T> {
-    header: Header,
     func: UnsafeCell<Fut<F, T>>,
 }
 
-unsafe impl<F: Send, T> Sync for BlockingRawTask<F, T> {}
-
-impl<F, T> RawTaskVTable for BlockingRawTask<F, T>
+impl<F, T> RawTaskVTable for RawTaskHeader<BlockingRawTask<F, T>>
 where
     F: FnOnce() -> T + Send + 'static,
     T: Send + 'static,
@@ -63,16 +61,16 @@ where
 
     unsafe fn poll(&self, _: &Waker) -> PollStatus {
         let maybe_panicked = catch_unwind(AssertUnwindSafe(|| {
-            let output = match (*self.func.get()).take() {
+            let output = match (*self.data.func.get()).take() {
                 Fut::Future(func) => func(), // Fn call may panic
                 _ => unreachable!(),
             };
             // Droping Fn closure may also panic.
-            (*self.func.get()).set_output(Ok(output));
+            (*self.data.func.get()).set_output(Ok(output));
         }));
 
         if let Err(err) = maybe_panicked {
-            (*self.func.get()).set_output(Err(JoinError::panic(err)));
+            (*self.data.func.get()).set_output(Err(JoinError::panic(err)));
         }
 
         if !self
@@ -81,14 +79,14 @@ where
         {
             // Receiver is not interested in the output, So we can drop it.
             // Panicking is acceptable here, as `BlockingTask` is only execute within the thread pool
-            unsafe { (*self.func.get()).drop() };
+            unsafe { (*self.data.func.get()).drop() };
         }
         PollStatus::Complete
     }
 
     unsafe fn read_output(&self, dst: *mut (), waker: &Waker) {
         if self.header.can_read_output_or_notify_when_readable(waker) {
-            *(dst as *mut _) = Poll::Ready((*self.func.get()).take_output());
+            *(dst as *mut _) = Poll::Ready((*self.data.func.get()).take_output());
         }
     }
 
@@ -98,7 +96,7 @@ where
             // If the task is complete then waker is droped by the executor.
             // We just need to drop the output
             let _ = panic::catch_unwind(AssertUnwindSafe(|| unsafe {
-                (*self.func.get()).drop();
+                (*self.data.func.get()).drop();
             }));
         } else {
             *self.header.join_waker.get() = None;
