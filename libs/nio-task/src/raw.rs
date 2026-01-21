@@ -45,21 +45,6 @@ unsafe impl<Data> Sync for RawTaskHeader<Data> {}
 
 pub type RawTask = ThinArc<dyn RawTaskVTable>;
 
-impl RawTask {
-    pub(crate) unsafe fn drop_join_handler(&self) {
-        let header = self.header();
-
-        let is_task_complete = header.state.unset_waker_and_interested();
-        if is_task_complete {
-            // If the task is complete then waker is droped by the executor.
-            // We just only need to drop the output.
-            unsafe { self.drop_output_from_join_handler() };
-        } else {
-            unsafe { *header.join_waker.get() = None };
-        }
-    }
-}
-
 pub trait RawTaskVTable {
     fn waker(&self, raw: RawTask) -> Waker;
 

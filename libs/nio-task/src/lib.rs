@@ -61,8 +61,6 @@ impl<M> Drop for Task<M> {
     }
 }
 
-// ------------------------------------------------
-
 pub struct Metadata<M = ()> {
     raw: RawTask,
     _meta: PhantomData<M>,
@@ -124,22 +122,13 @@ impl<M> Task<M> {
     }
 
     pub fn metadata(&self) -> &M {
-        unsafe {
-            &*(self.raw.as_ref().unwrap_unchecked())
-                .metadata()
-                .cast::<M>()
-        }
+        unsafe { &*self.raw.as_ref().unwrap_unchecked().metadata().cast() }
     }
 
     pub fn metadata_mut(&mut self) -> &mut M {
-        unsafe {
-            &mut *(self.raw.as_ref().unwrap_unchecked())
-                .metadata()
-                .cast::<M>()
-        }
+        unsafe { &mut *self.raw.as_ref().unwrap_unchecked().metadata().cast() }
     }
 
-    /// # Safety
     pub unsafe fn new_unchecked<F, S>(
         meta: M,
         future: F,

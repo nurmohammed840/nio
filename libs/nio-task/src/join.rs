@@ -65,7 +65,16 @@ impl<T> Future for JoinHandle<T> {
 
 impl<T> Drop for JoinHandle<T> {
     fn drop(&mut self) {
-        unsafe { self.raw.drop_join_handler() };
+        let header = self.raw.header();
+
+        let is_task_complete = header.state.unset_waker_and_interested();
+        if is_task_complete {
+            // If the task is complete then waker is droped by the executor.
+            // We just only need to drop the output.
+            unsafe { self.raw.drop_output_from_join_handler() };
+        } else {
+            unsafe { *header.join_waker.get() = None };
+        }
     }
 }
 
