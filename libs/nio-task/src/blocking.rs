@@ -3,9 +3,9 @@ use crate::thin_arc::ThinArc;
 use crate::{JoinError, JoinHandle, TaskId};
 
 use std::cell::UnsafeCell;
+use std::fmt;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::task::{Poll, Waker};
-use std::{fmt, panic};
 
 pub struct BlockingTask {
     raw: RawTask,
@@ -87,17 +87,8 @@ where
         }
     }
 
-    unsafe fn drop_join_handler(&self) {
-        let is_task_complete = self.header.state.unset_waker_and_interested();
-        if is_task_complete {
-            // If the task is complete then waker is droped by the executor.
-            // We just need to drop the output
-            let _ = panic::catch_unwind(AssertUnwindSafe(|| unsafe {
-                (*self.data.func.get()).drop();
-            }));
-        } else {
-            *self.header.join_waker.get() = None;
-        }
+    unsafe fn drop_output_from_join_handler(&self) {
+        (*self.data.func.get()).drop();
     }
 
     unsafe fn schedule(&self, _: RawTask) {}

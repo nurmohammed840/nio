@@ -90,8 +90,6 @@ where
     }
 
     unsafe fn drop_task(&self) {
-        // TODO: Also drop task metadata.
-
         let may_panic = catch_unwind(AssertUnwindSafe(|| {
             (*self.data.future.get()).set_output(Err(JoinError::cancelled()));
         }));
@@ -112,17 +110,9 @@ where
         }
     }
 
-    unsafe fn drop_join_handler(&self) {
-        let is_task_complete = self.header.state.unset_waker_and_interested();
-        if is_task_complete {
-            // If the task is complete then waker is droped by the executor.
-            // We just only need to drop the output.
-            let _ = catch_unwind(AssertUnwindSafe(|| unsafe {
-                (*self.data.future.get()).drop();
-            }));
-        } else {
-            *self.header.join_waker.get() = None;
-        }
+    /// Panic is fine, Because this function will only called from `JoinHandle::drop`
+    unsafe fn drop_output_from_join_handler(&self) {
+        (*self.data.future.get()).drop();
     }
 }
 
