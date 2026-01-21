@@ -7,6 +7,7 @@ use crate::thin_arc::ThinArc;
 pub struct TaskId(pub(crate) NonZero<usize>);
 
 impl TaskId {
+    #[inline]
     pub(super) fn new(task: &RawTask) -> TaskId {
         TaskId(unsafe { NonZero::new_unchecked(ThinArc::as_ptr(task).addr()) })
     }

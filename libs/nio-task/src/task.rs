@@ -106,12 +106,6 @@ where
         }
     }
 
-    unsafe fn abort_task(&self, raw: RawTask) {
-        if self.header.transition_to_abort() {
-            self.schedule(raw)
-        }
-    }
-
     unsafe fn read_output(&self, dst: *mut (), waker: &Waker) {
         if self.header.can_read_output_or_notify_when_readable(waker) {
             *(dst as *mut _) = Poll::Ready((*self.data.future.get()).take_output());
@@ -164,6 +158,15 @@ where
             if this.header.transition_to_notified() {
                 Self::schedule_by_ref(this);
             }
+        }
+    }
+}
+
+impl RawTask {
+    #[inline]
+    pub(crate) fn abort_task(&self) {
+        if self.header().transition_to_notified_with_cancelled_flag() {
+            unsafe { self.schedule(self.clone()) }
         }
     }
 }

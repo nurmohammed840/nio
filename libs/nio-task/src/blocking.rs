@@ -101,7 +101,6 @@ where
     }
 
     unsafe fn schedule(&self, _: RawTask) {}
-    unsafe fn abort_task(&self, _: RawTask) {}
     unsafe fn drop_task(&self) {}
 }
 

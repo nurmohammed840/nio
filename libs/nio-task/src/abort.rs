@@ -11,16 +11,17 @@ unsafe impl Send for AbortHandle {}
 unsafe impl Sync for AbortHandle {}
 
 impl AbortHandle {
+    #[inline]
     pub fn abort(&self) {
-        unsafe {
-            self.raw.abort_task(self.raw.clone());
-        }
+        self.raw.abort_task();
     }
 
+    #[inline]
     pub fn is_finished(&self) -> bool {
         self.raw.header().state.load().has(COMPLETE)
     }
 
+    #[inline]
     pub fn id(&self) -> TaskId {
         TaskId::new(&self.raw)
     }

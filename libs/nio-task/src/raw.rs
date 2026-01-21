@@ -54,7 +54,6 @@ pub trait RawTaskVTable {
     unsafe fn schedule(&self, raw: RawTask);
     unsafe fn drop_task(&self);
 
-    unsafe fn abort_task(&self, raw: RawTask);
     /// `dst: &mut Poll<Result<Future::Output, JoinError>>`
     unsafe fn read_output(&self, dst: *mut (), waker: &Waker);
     unsafe fn drop_join_handler(&self);
@@ -109,7 +108,7 @@ impl Header {
     /// `(RUNNING | SLEEP) -> NOTIFIED`
     ///
     /// Return `true` if the task is in `SLEEP` state
-    pub fn transition_to_abort(&self) -> bool {
+    pub fn transition_to_notified_with_cancelled_flag(&self) -> bool {
         self.state.set_notified_with_cancelled_flag().is(SLEEP)
     }
 

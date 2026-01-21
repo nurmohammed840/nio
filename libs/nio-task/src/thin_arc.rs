@@ -1,5 +1,5 @@
 use crate::raw::{Header, RawTaskHeader, RawTaskVTable};
-use std::{marker::PhantomData, mem::ManuallyDrop, ptr::NonNull};
+use std::{marker::PhantomData, mem::ManuallyDrop, panic, ptr::NonNull};
 
 pub struct ThinArc<Data: ?Sized> {
     ptr: NonNull<Data>,
@@ -7,6 +7,8 @@ pub struct ThinArc<Data: ?Sized> {
 }
 
 impl<T: ?Sized> Unpin for ThinArc<T> {}
+impl<T: panic::RefUnwindSafe + ?Sized> panic::UnwindSafe for ThinArc<T> {}
+
 unsafe impl<T: ?Sized + Sync + Send> Send for ThinArc<T> {}
 unsafe impl<T: ?Sized + Sync + Send> Sync for ThinArc<T> {}
 
@@ -44,6 +46,7 @@ impl<Data: ?Sized> ThinArc<Data> {
         NonNull::as_ptr(this.ptr)
     }
 
+    #[inline]
     pub fn clone_without_ref_inc(&self) -> Self {
         unsafe { ThinArc::from_inner(self.ptr) }
     }

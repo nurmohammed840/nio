@@ -27,20 +27,24 @@ impl<T> JoinHandle<T> {
         }
     }
 
+    #[inline]
     pub fn abort_handle(&self) -> AbortHandle {
         AbortHandle {
             raw: self.raw.clone(),
         }
     }
 
+    #[inline]
     pub fn abort(&self) {
-        unsafe { self.raw.abort_task(self.raw.clone()) };
+        self.raw.abort_task();
     }
 
+    #[inline]
     pub fn is_finished(&self) -> bool {
         self.raw.header().state.load().has(COMPLETE)
     }
 
+    #[inline]
     pub fn id(&self) -> TaskId {
         TaskId::new(&self.raw)
     }
@@ -50,12 +54,11 @@ impl<T> Future for JoinHandle<T> {
     type Output = Result<T, JoinError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut ret = Poll::Pending;
+        let mut ret: Poll<Result<T, JoinError>> = Poll::Pending;
         unsafe {
             self.raw
                 .read_output(&mut ret as *mut _ as *mut (), cx.waker());
         }
-
         ret
     }
 }
