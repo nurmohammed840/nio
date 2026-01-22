@@ -153,7 +153,11 @@ fn blocking() {
 
     let (tx, rx) = mpsc::channel();
 
-    let rt = multi();
+    let rt = RuntimeBuilder::new()
+        .threadpool_load_factor(1)
+        .rt()
+        .unwrap();
+    
     let cnt = Arc::new(AtomicUsize::new(0));
 
     // there are four workers in the pool

@@ -1,7 +1,12 @@
 use mpmc_channel::MPMC;
 use std::{collections::VecDeque, io, num::NonZero, sync::Arc, thread, time::Duration};
 
-type Channel<Task> = Arc<MPMC<VecDeque<Task>>>;
+type Channel<Task> = Arc<MPMC<Queue<Task>>>;
+
+struct Queue<Task> {
+    tasks: VecDeque<Task>,
+    count: usize,
+}
 
 pub struct ThreadPool<Task: Runnable> {
     channel: Channel<Task>,
@@ -17,9 +22,12 @@ pub struct ThreadPool<Task: Runnable> {
 impl<T: Runnable> Default for ThreadPool<T> {
     fn default() -> Self {
         Self {
-            channel: Arc::new(MPMC::new(VecDeque::with_capacity(64))),
+            channel: Arc::new(MPMC::new(Queue {
+                tasks: VecDeque::with_capacity(64),
+                count: 0,
+            })),
 
-            timeout: Some(Duration::from_secs(3)),
+            timeout: Some(Duration::from_secs(7)),
             max_threads_limit: 32,
             load_factor: 2,
             stack_size: None,
@@ -54,7 +62,7 @@ impl<Task: Runnable> ThreadPool<Task> {
     }
 
     pub fn load_factor(mut self, factor: usize) -> Self {
-        assert!(factor != 0 , "threadpool load factor must be > 0");
+        assert!(factor != 0, "threadpool load factor must be > 0");
         self.load_factor = factor;
         self
     }
@@ -93,8 +101,9 @@ impl<Task: Runnable> ThreadPool<Task> {
 
     pub fn add_task_to_queue(&self, task: Task) -> usize {
         let mut tx = self.channel.produce();
-        tx.push_back(task);
-        let task_count = tx.len();
+        tx.tasks.push_back(task);
+        tx.count += 1;
+        let task_count = tx.count;
         tx.notify_one();
         task_count
     }
@@ -124,11 +133,14 @@ impl<Task: Runnable> ThreadPool<Task> {
         let worker = move || {
             let mut rx = channel.consume();
             loop {
-                rx = match rx.pop_front() {
+                rx = match rx.tasks.pop_front() {
                     Some(task) => {
                         drop(rx);
                         task.run();
-                        channel.consume()
+                        
+                        let mut rx = channel.consume();
+                        rx.count -= 1;
+                        rx
                     }
                     None => match timeout {
                         None => rx.wait(),
