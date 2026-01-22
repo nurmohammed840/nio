@@ -32,6 +32,7 @@ pub struct RuntimeBuilder {
     event_interval: u32,
     min_tasks_per_worker: Option<NonZero<usize>>,
 
+    threadpool_load_factor: usize,
     max_blocking_threads: u16,
     thread_stack_size: usize,
     thread_timeout: Option<Duration>,
@@ -56,6 +57,7 @@ impl Default for RuntimeBuilder {
             event_interval: 61,
             min_tasks_per_worker: None,
 
+            threadpool_load_factor: 2,
             max_blocking_threads: 512,
             thread_stack_size: 0,
             thread_timeout: Some(Duration::from_secs(10)),
@@ -105,6 +107,11 @@ impl RuntimeBuilder {
 
     pub fn thread_stack_size(mut self, size: usize) -> Self {
         self.thread_stack_size = size;
+        self
+    }
+
+    pub fn threadpool_load_factor(mut self, factor: usize) -> Self {
+        self.threadpool_load_factor = factor;
         self
     }
 

@@ -9,7 +9,7 @@ impl Runtime {
         Self(
             nio::RuntimeBuilder::new()
                 .measurement(SimpleMeasurement::new())
-                .min_tasks_per_worker(core)
+                .min_tasks_per_worker(2)
                 .worker_threads(core as u8)
                 .rt()
                 .unwrap(),
@@ -21,6 +21,7 @@ impl Runtime {
             nio::RuntimeBuilder::new()
                 .measurement(SimpleMeasurement::new())
                 .max_blocking_threads(512)
+                .threadpool_load_factor(2)
                 .rt()
                 .unwrap(),
         )

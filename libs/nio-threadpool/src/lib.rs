@@ -1,5 +1,5 @@
 use mpmc_channel::MPMC;
-use std::{collections::VecDeque, io, num::NonZeroUsize, sync::Arc, thread, time::Duration};
+use std::{collections::VecDeque, io, num::NonZero, sync::Arc, thread, time::Duration};
 
 type Channel<Task> = Arc<MPMC<VecDeque<Task>>>;
 
@@ -9,17 +9,19 @@ pub struct ThreadPool<Task: Runnable> {
     // ----- config -----
     max_threads_limit: u16,
     timeout: Option<Duration>,
-    stack_size: Option<NonZeroUsize>,
+    stack_size: Option<NonZero<usize>>,
+    load_factor: usize,
     name: Box<dyn Fn(usize) -> String + Send + Sync>,
 }
 
 impl<T: Runnable> Default for ThreadPool<T> {
     fn default() -> Self {
         Self {
-            channel: Default::default(),
+            channel: Arc::new(MPMC::new(VecDeque::with_capacity(64))),
 
-            timeout: Some(Duration::from_secs(10)),
-            max_threads_limit: 512,
+            timeout: Some(Duration::from_secs(3)),
+            max_threads_limit: 32,
+            load_factor: 2,
             stack_size: None,
             name: Box::new(|id| format!("Worker: {id}")),
         }
@@ -47,7 +49,13 @@ impl<Task: Runnable> ThreadPool<Task> {
     }
 
     pub fn stack_size(mut self, stack_size: usize) -> Self {
-        self.stack_size = NonZeroUsize::new(stack_size);
+        self.stack_size = NonZero::new(stack_size);
+        self
+    }
+
+    pub fn load_factor(mut self, factor: usize) -> Self {
+        assert!(factor != 0 , "threadpool load factor must be > 0");
+        self.load_factor = factor;
         self
     }
 
@@ -76,27 +84,35 @@ impl<Task: Runnable> ThreadPool<Task> {
     // -------------------------------------------
 
     pub fn thread_count(&self) -> usize {
-        Arc::strong_count(&self.channel)
+        Arc::strong_count(&self.channel) - 1
     }
 
     pub fn is_thread_limit_reached(&self) -> bool {
         self.thread_count() > self.get_max_threads_limit().into()
     }
 
-    pub fn add_task_to_queue(&self, task: Task) {
+    pub fn add_task_to_queue(&self, task: Task) -> usize {
         let mut tx = self.channel.produce();
         tx.push_back(task);
+        let task_count = tx.len();
         tx.notify_one();
+        task_count
     }
 
     pub fn execute(&self, task: Task) {
-        self.add_task_to_queue(task);
+        let task_count = self.add_task_to_queue(task);
 
-        if self.is_thread_limit_reached() {
+        let thread_count = self.thread_count();
+        if thread_count > self.get_max_threads_limit().into() {
             return;
         }
 
-        let b = thread_builder(self);
+        let threshold = thread_count * self.load_factor;
+        if task_count <= threshold {
+            return;
+        }
+
+        let b = self.thread_builder();
         self.spawn(b)
             .expect("failed to spawn a thread in thread pool");
     }
@@ -126,16 +142,16 @@ impl<Task: Runnable> ThreadPool<Task> {
         };
         thread_builder.spawn(worker)
     }
-}
 
-fn thread_builder<T: Runnable>(pool: &ThreadPool<T>) -> thread::Builder {
-    let mut thread = thread::Builder::new();
-    if let Some(size) = pool.get_stack_size() {
-        thread = thread.stack_size(size);
+    pub fn thread_builder(&self) -> thread::Builder {
+        let mut thread = thread::Builder::new();
+        if let Some(size) = self.get_stack_size() {
+            thread = thread.stack_size(size);
+        }
+        let name = (self.name)(self.thread_count());
+        if !name.is_empty() {
+            thread = thread.name(name);
+        }
+        thread
     }
-    let name = (pool.name)(pool.thread_count());
-    if !name.is_empty() {
-        thread = thread.name(name);
-    }
-    thread
 }
