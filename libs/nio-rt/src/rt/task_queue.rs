@@ -94,11 +94,11 @@ impl TaskQueue {
     }
 
     pub fn increase_local(&self) -> Counter {
-        Counter(self.counter.fetch_add(LOCAL_COUNTER_ONE, Ordering::AcqRel))
+        Counter(self.counter.fetch_add(LOCAL_COUNTER_ONE, Ordering::Relaxed))
     }
 
     pub fn decrease_local(&self) -> Counter {
-        let old = Counter(self.counter.fetch_sub(LOCAL_COUNTER_ONE, Ordering::AcqRel));
+        let old = Counter(self.counter.fetch_sub(LOCAL_COUNTER_ONE, Ordering::Relaxed));
         debug_assert!(old.local() > 0);
         old
     }
@@ -126,7 +126,7 @@ impl TaskQueue {
         let shared = n.shared();
         self.counter.fetch_add(
             (shared << LOCAL_COUNTER_BIT_SIZE) - shared,
-            Ordering::Release,
+            Ordering::Relaxed,
         );
     }
 
