@@ -59,7 +59,10 @@ impl RuntimeContext {
         Fut: Future + 'static,
         Fut::Output: Send + 'static,
     {
-        self._spawn_pinned_at(self.workers.id(id), future)
+        let id = self.workers.id(id);
+        let (task, join) = LocalScheduler::spawn(id, self.clone(), future());
+        self.send_task_at(id, task);
+        join
     }
 
     pub fn spawn_pinned<F, Fut>(self: &Arc<Self>, future: F) -> JoinHandle<Fut::Output>
@@ -68,15 +71,8 @@ impl RuntimeContext {
         Fut: Future + 'static,
         Fut::Output: Send + 'static,
     {
-        self._spawn_pinned_at(self.workers.least_loaded_worker(), future)
-    }
-
-    fn _spawn_pinned_at<F, Fut>(self: &Arc<Self>, id: WorkerId, fut: F) -> JoinHandle<Fut::Output>
-    where
-        F: FnOnce() -> Fut,
-        Fut: Future + 'static,
-    {
-        let (task, join) = LocalScheduler::spawn(id, self.clone(), fut());
+        let id = self.workers.least_loaded_worker();
+        let (task, join) = LocalScheduler::spawn(id, self.clone(), future());
         self.send_task_at(id, task);
         join
     }

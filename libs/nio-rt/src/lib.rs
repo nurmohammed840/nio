@@ -155,7 +155,12 @@ where
     F: Future + Send + 'static,
     F::Output: Send + 'static,
 {
-    RuntimeContext::with(|ctx| ctx.spawn(future))
+    use rt::context::Context;
+    Context::get(|ctx| match ctx {
+        Context::None => panic!("no `Nio` runtime available"),
+        Context::Global(ctx) => ctx.spawn(future),
+        Context::Local(ctx) => ctx.spawn(future),
+    })
 }
 
 pub fn spawn_pinned<F, Fut>(future: F) -> JoinHandle<Fut::Output>
@@ -164,7 +169,12 @@ where
     Fut: Future + 'static,
     Fut::Output: Send + 'static,
 {
-    RuntimeContext::with(|ctx| ctx.spawn_pinned(future))
+    use rt::context::Context;
+    Context::get(|ctx| match ctx {
+        Context::None => panic!("no `Nio` runtime available"),
+        Context::Global(ctx) => ctx.spawn_pinned(future),
+        Context::Local(ctx) => ctx.spawn_pinned(future),
+    })
 }
 
 pub fn spawn_pinned_at<F, Fut>(worker: u8, future: F) -> JoinHandle<Fut::Output>

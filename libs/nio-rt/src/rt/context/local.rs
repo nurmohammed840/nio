@@ -17,6 +17,22 @@ pub struct LocalContext {
 }
 
 impl LocalContext {
+    pub(crate) fn new(
+        worker_id: WorkerId,
+        cap: usize,
+        runtime_ctx: Arc<RuntimeContext>,
+        io_registry: driver::Registry,
+    ) -> Rc<Self> {
+        LocalContext {
+            worker_id,
+            timers: UnsafeCell::new(Timers::new()),
+            local_queue: UnsafeCell::new(VecDeque::with_capacity(cap)),
+            runtime_ctx,
+            io_registry,
+        }
+        .into()
+    }
+
     pub(crate) fn init(self: Rc<Self>) {
         Context::init(self);
     }
@@ -46,20 +62,37 @@ impl LocalContext {
         join
     }
 
-    pub(crate) fn new(
-        worker_id: WorkerId,
-        cap: usize,
-        runtime_ctx: Arc<RuntimeContext>,
-        io_registry: driver::Registry,
-    ) -> Rc<Self> {
-        LocalContext {
-            worker_id,
-            timers: UnsafeCell::new(Timers::new()),
-            local_queue: UnsafeCell::new(VecDeque::with_capacity(cap)),
-            runtime_ctx,
-            io_registry,
+    pub(crate) fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
+    where
+        F: Future + Send + 'static,
+        F::Output: Send + 'static,
+    {
+        let (task, join) = Scheduler::spawn(self.runtime_ctx.clone(), future);
+        let id = self.runtime_ctx.workers.least_loaded_worker();
+
+        if self.worker_id == id {
+            self.add_task_to_local_queue(task);
+        } else {
+            self.runtime_ctx.send_task_at(id, task);
         }
-        .into()
+        join
+    }
+
+    pub(crate) fn spawn_pinned<F, Fut>(&self, future: F) -> JoinHandle<Fut::Output>
+    where
+        F: FnOnce() -> Fut + Send,
+        Fut: Future + 'static,
+        Fut::Output: Send + 'static,
+    {
+        let id = self.runtime_ctx.workers.least_loaded_worker();
+        let (task, join) = LocalScheduler::spawn(id, self.runtime_ctx.clone(), future());
+
+        if self.worker_id == id {
+            self.add_task_to_local_queue(task);
+        } else {
+            self.runtime_ctx.send_task_at(id, task);
+        }
+        join
     }
 
     pub(crate) fn add_task_to_local_queue(&self, task: Task) {
