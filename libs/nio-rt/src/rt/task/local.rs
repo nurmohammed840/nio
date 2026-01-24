@@ -2,7 +2,7 @@ use nio_task::{JoinHandle, Task};
 use std::{mem::ManuallyDrop, pin::Pin, sync::Arc, task::Poll};
 
 use crate::rt::{
-    context::{Context, RuntimeContext},
+    context::{NioContext, RuntimeContext},
     worker::WorkerId,
 };
 
@@ -13,8 +13,8 @@ pub struct LocalScheduler {
 
 impl nio_task::Scheduler for LocalScheduler {
     fn schedule(&self, task: Task) {
-        Context::get(|ctx| match ctx {
-            Context::Local(ctx) if self.pinned == ctx.worker_id => {
+        NioContext::get(|ctx| match ctx {
+            NioContext::Local(ctx) if self.pinned == ctx.worker_id => {
                 ctx.add_task_to_local_queue(task)
             }
             _ => self.runtime_ctx.send_task_at(self.pinned, task),
@@ -55,9 +55,9 @@ struct LocalFuture<F> {
 }
 
 fn is_same_worker(f: impl FnOnce(WorkerId) -> bool) -> bool {
-    Context::get(|ctx| match ctx {
-        Context::Local(ctx) => f(ctx.worker_id),
-        Context::None | Context::Global(_) => false,
+    NioContext::get(|ctx| match ctx {
+        NioContext::Local(ctx) => f(ctx.worker_id),
+        NioContext::None | NioContext::Runtime(_) => false,
     })
 }
 

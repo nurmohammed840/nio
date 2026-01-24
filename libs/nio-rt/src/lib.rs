@@ -24,6 +24,8 @@ pub use timer::{
     timeout::{Timeout, timeout},
 };
 
+use crate::rt::context::{no_rt_found_panic, NioContext};
+
 pub struct RuntimeBuilder {
     worker_threads: u8,
     worker_stack_size: Option<NonZeroUsize>,
@@ -155,11 +157,10 @@ where
     F: Future + Send + 'static,
     F::Output: Send + 'static,
 {
-    use rt::context::Context;
-    Context::get(|ctx| match ctx {
-        Context::None => panic!("no `Nio` runtime available"),
-        Context::Global(ctx) => ctx.spawn(future),
-        Context::Local(ctx) => ctx.spawn(future),
+    NioContext::get(|ctx| match ctx {
+        NioContext::None => no_rt_found_panic(),
+        NioContext::Runtime(ctx) => ctx.spawn(future),
+        NioContext::Local(ctx) => ctx.spawn(future),
     })
 }
 
@@ -169,11 +170,10 @@ where
     Fut: Future + 'static,
     Fut::Output: Send + 'static,
 {
-    use rt::context::Context;
-    Context::get(|ctx| match ctx {
-        Context::None => panic!("no `Nio` runtime available"),
-        Context::Global(ctx) => ctx.spawn_pinned(future),
-        Context::Local(ctx) => ctx.spawn_pinned(future),
+    NioContext::get(|ctx| match ctx {
+        NioContext::None => no_rt_found_panic(),
+        NioContext::Runtime(ctx) => ctx.spawn_pinned(future),
+        NioContext::Local(ctx) => ctx.spawn_pinned(future),
     })
 }
 

@@ -34,17 +34,17 @@ impl LocalContext {
     }
 
     pub(crate) fn init(self: Rc<Self>) {
-        Context::init(self);
+        NioContext::init(self);
     }
 
     pub(crate) fn with<F, R>(f: F) -> R
     where
         F: FnOnce(&Rc<LocalContext>) -> R,
     {
-        Context::get(|ctx| match ctx {
-            Context::None => panic!("no `Nio` runtime available"),
-            Context::Global(_) => panic!("no `Nio` local runtime found"),
-            Context::Local(ctx) => f(ctx),
+        NioContext::get(|ctx| match ctx {
+            NioContext::None => no_rt_found_panic(),
+            NioContext::Runtime(_) => no_local_rt_found_panic(),
+            NioContext::Local(ctx) => f(ctx),
         })
     }
 

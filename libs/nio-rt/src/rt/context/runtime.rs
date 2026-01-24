@@ -14,10 +14,10 @@ impl RuntimeContext {
     where
         F: FnOnce(&Arc<RuntimeContext>) -> R,
     {
-        Context::get(|ctx| match ctx {
-            Context::None => panic!("no `Nio` runtime available"),
-            Context::Global(ctx) => f(ctx),
-            Context::Local(ctx) => f(&ctx.runtime_ctx),
+        NioContext::get(|ctx| match ctx {
+            NioContext::None => no_rt_found_panic(),
+            NioContext::Runtime(ctx) => f(ctx),
+            NioContext::Local(ctx) => f(&ctx.runtime_ctx),
         })
     }
 
@@ -30,7 +30,7 @@ impl RuntimeContext {
     }
 
     pub fn enter(self: Arc<Self>) {
-        Context::enter(self);
+        NioContext::enter(self);
     }
 
     pub fn spawn_blocking<F, R>(&self, f: F) -> JoinHandle<R>
