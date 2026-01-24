@@ -12,8 +12,9 @@ use import::rt::*;
 use import::task::yield_now;
 
 mod import {
-    pub mod rt;
     pub mod task;
+
+    pub mod rt;
     // pub mod rt {
     //     pub mod tokio;
     //     pub use tokio::*;
@@ -110,19 +111,21 @@ fn rt_multi_spawn_many_remote_idle(c: &mut Criterion) {
     });
 }
 
+
 // The runtime is busy with tasks that consume CPU time and yield. Yielding is a
 // lower notification priority than spawning / regular notification.
 fn rt_multi_spawn_many_remote_busy1(c: &mut Criterion) {
     let rt = Runtime::new(NUM_WORKERS);
-    let rt_handle = rt.handle();
 
     static FLAG: AtomicBool = AtomicBool::new(true);
 
     // Spawn some tasks to keep the runtimes busy
     for _ in 0..(2 * NUM_WORKERS) {
-        rt.spawn(async move {
+        rt.spawn(async {
             while FLAG.load(Relaxed) {
-                yield_now().await;
+                // yield_now().await;
+                // tokio need it to complete
+                ::tokio::task::yield_now().await;
                 stall();
             }
         });
@@ -130,13 +133,12 @@ fn rt_multi_spawn_many_remote_busy1(c: &mut Criterion) {
 
     c.bench_function("spawn_many_remote_busy1", |b| {
         b.iter(|| {
-            let mut handles = Vec::with_capacity(NUM_SPAWN);
-
-            for _ in 0..NUM_SPAWN {
-                handles.push(rt_handle.spawn(async {}));
-            }
-
             rt.block_on(async {
+                let mut handles = Vec::with_capacity(NUM_SPAWN);
+    
+                for _ in 0..NUM_SPAWN {
+                    handles.push(spawn(async {}));
+                }
                 for handle in handles {
                     handle.await.unwrap();
                 }

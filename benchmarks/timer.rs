@@ -27,7 +27,7 @@ fn multi_thread_scheduler_timeout(c: &mut Criterion) {
 }
 
 fn do_timeout_test(c: &mut Criterion, workers: usize, name: &str) {
-    let runtime = Runtime::new(workers);
+    let runtime = Runtime::timer_rt(workers);
     c.bench_function(name, |b| {
         b.iter_custom(|iters| {
             let start = Instant::now();
@@ -63,7 +63,7 @@ fn multi_thread_scheduler_sleep(c: &mut Criterion) {
 }
 
 fn do_sleep_test(c: &mut Criterion, workers: usize, name: &str) {
-    let runtime = Runtime::new(workers);
+    let runtime = Runtime::timer_rt(workers);
 
     c.bench_function(name, |b| {
         b.iter_custom(|iters| {

@@ -20,20 +20,7 @@ async fn work() -> usize {
     black_box(val)
 }
 
-fn basic_scheduler_spawn(c: &mut Criterion) {
-    let runtime = Runtime::new(1);
-
-    c.bench_function("basic_scheduler_spawn", |b| {
-        b.iter(|| {
-            runtime.block_on(async {
-                let h = rt::spawn(work());
-                assert_eq!(h.await.unwrap(), 2);
-            });
-        })
-    });
-}
-
-const COUNT: [usize; 3] = [10, 100, 1000];
+const COUNT: [usize; 4] = [10, 100, 1000, 10_000];
 
 fn basic_scheduler_spawn_many(c: &mut Criterion) {
     let runtime = Runtime::new(1);
@@ -52,19 +39,6 @@ fn basic_scheduler_spawn_many(c: &mut Criterion) {
             })
         });
     }
-}
-
-fn threaded_scheduler_spawn(c: &mut Criterion) {
-    let runtime = Runtime::new(2);
-
-    c.bench_function("threaded_scheduler_spawn", |b| {
-        b.iter(|| {
-            runtime.block_on(async {
-                let h = rt::spawn(work());
-                assert_eq!(h.await.unwrap(), 2);
-            });
-        })
-    });
 }
 
 fn threaded_scheduler_spawn_many(c: &mut Criterion) {
@@ -88,9 +62,7 @@ fn threaded_scheduler_spawn_many(c: &mut Criterion) {
 
 criterion_group!(
     spawn,
-    basic_scheduler_spawn,
     basic_scheduler_spawn_many,
-    threaded_scheduler_spawn,
     threaded_scheduler_spawn_many,
 );
 

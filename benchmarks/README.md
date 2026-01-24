@@ -39,16 +39,17 @@ CPU: AMD Ryzen 7 5700 (8 Cores / 16 Threads)
 
 ## rt_multi_threaded
 
-| Test Name               |    Nio    | Tokio |
-| ----------------------- | :-------: | :---: |
-| spawn_many_local        |  2.66 ms  |   —   |
-| spawn_many_remote       |  1.17 ms  |   —   |
-| spawn_many_remote_idle  |  1.60 ms  |   —   |
-| spawn_many_remote_busy1 |  1.05 ms  |   —   |
-| spawn_many_remote_busy2 |  125 µs   |   —   |
-| ping_pong               | 348.54 µs |   —   |
-| yield_many              |   3 ms    |   —   |
-| chained_spawn           | 89.57 µs  |   —   |
+| Test Name               |    Nio    |   Tokio   |
+| ----------------------- | :-------: | :-------: |
+| spawn_many_local        | 2.694 ms  | 2.524 ms  |
+| spawn_many_remote       | 1.110 ms  | 1.481 ms  |
+| spawn_many_remote_idle  | 1.598 ms  | 2.464 ms  |
+| spawn_many_remote_busy1 | 1.558 ms  | 1.801 ms  |
+| spawn_many_remote_busy2 | 129.42 µs | 31.277 ms |
+| ping_pong               | 353.30 µs | 313.10 µs |
+| yield_many              | 3.015 ms  | 3.092 ms  |
+| chained_spawn           | 95.075 µs | 206.94 µs |
+
 
 
 ## spawn_blocking
@@ -63,54 +64,72 @@ CPU: AMD Ryzen 7 5700 (8 Cores / 16 Threads)
 
 ## spawn
 
-| Test Name                     |    Nio    |   Tokio   |
-| ----------------------------- | :-------: | :-------: |
-| basic_scheduler_spawn         |  7.77 µs  |  2.23 µs  |
-| basic_scheduler_spawn_10      | 10.93 µs  |  4.07 µs  |
-| basic_scheduler_spawn_100     | 22.51 µs  | 24.10 µs  |
-| basic_scheduler_spawn_1000    | 130.12 µs | 221.97 µs |
-| threaded_scheduler_spawn      |  7.80 µs  |  3.11 µs  |
-| threaded_scheduler_spawn_10   | 22.94 µs  |  4.65 µs  |
-| threaded_scheduler_spawn_100  | 23.82 µs  | 24.37 µs  |
-| threaded_scheduler_spawn_1000 | 123.41 µs | 274.15 µs |
-
+| Test Name                      |    Nio    |   Tokio   |
+| ------------------------------ | :-------: | :-------: |
+| basic_scheduler_spawn_10       | 11.14 µs  |  3.87 µs  |
+| basic_scheduler_spawn_100      | 23.05 µs  | 24.44 µs  |
+| basic_scheduler_spawn_1000     | 130.80 µs | 218.63 µs |
+| basic_scheduler_spawn_10000    | 1.217 ms  | 2.313 ms  |
+| threaded_scheduler_spawn_10    | 22.87 µs  |  4.31 µs  |
+| threaded_scheduler_spawn_100   | 23.87 µs  | 23.18 µs  |
+| threaded_scheduler_spawn_1000  | 124.97 µs | 257.75 µs |
+| threaded_scheduler_spawn_10000 | 1.106 ms  | 2.578 ms  |
 
 ## sync_broadcast
 
-| Test Name       |   Nio    |  Tokio   |
-| --------------- | :------: | :------: |
-| contention/10   | 1.95 ms  | 1.83 ms  |
-| contention/100  | 4.72 ms  | 4.98 ms  |
-| contention/500  | 17.45 ms | 16.25 ms |
-| contention/1000 | 34.45 ms | 30.29 ms |
+| Test Name       |    Nio    |   Tokio   |
+| --------------- | :-------: | :-------: |
+| contention/10   | 1.898 ms  | 1.834 ms  |
+| contention/100  | 4.501 ms  | 4.935 ms  |
+| contention/500  | 15.574 ms | 15.804 ms |
+| contention/1000 | 30.954 ms | 29.251 ms |
+
 
 ## sync_mpsc_oneshot
 
 | Test Name        |    Nio    |  Tokio   |
 | ---------------- | :-------: | :------: |
-| request_reply    | 222.54 µs | 1.979 ms |
-| request_reply #2 | 233.26 µs | 3.180 ms |
+| request_reply    | 219.53 µs | 1.994 ms |
+| request_reply #2 | 230.50 µs | 3.127 ms |
+
 
 ## sync_mpsc
 
 | Test Name             |    Nio    |   Tokio   |
 | --------------------- | :-------: | :-------: |
-| contention/unbounded  | 422.93 µs | 430.35 µs |
-| uncontented/unbounded | 202.55 µs | 180.97 µs |
+| contention/unbounded  | 382.48 µs | 432.05 µs |
+| uncontented/unbounded | 211.65 µs | 180.52 µs |
+
 
 ## sync_notify
 
 | Test Name          |    Nio    |   Tokio   |
 | ------------------ | :-------: | :-------: |
-| notify_one/10      | 152.90 µs | 90.60 µs  |
-| notify_one/50      | 235.92 µs | 88.26 µs  |
-| notify_one/100     | 240.42 µs | 84.52 µs  |
-| notify_one/200     | 249.60 µs | 88.56 µs  |
-| notify_one/500     | 251.92 µs | 87.61 µs  |
-| notify_waiters/10  | 158.44 µs | 119.18 µs |
-| notify_waiters/50  | 247.32 µs | 122.08 µs |
-| notify_waiters/100 | 278.90 µs | 122.19 µs |
-| notify_waiters/200 | 331.49 µs | 123.10 µs |
-| notify_waiters/500 | 424.12 µs | 123.60 µs |
+| notify_one/10      | 121.73 µs | 91.541 µs |
+| notify_one/50      | 204.25 µs | 90.457 µs |
+| notify_one/100     | 192.81 µs | 87.222 µs |
+| notify_one/200     | 202.02 µs | 86.915 µs |
+| notify_one/500     | 198.40 µs | 85.629 µs |
+| notify_waiters/10  | 136.45 µs | 128.23 µs |
+| notify_waiters/50  | 198.11 µs | 125.44 µs |
+| notify_waiters/100 | 215.11 µs | 124.70 µs |
+| notify_waiters/200 | 263.39 µs | 125.58 µs |
+| notify_waiters/500 | 329.58 µs | 125.25 µs |
 
-### sync_semaphore
+## sync_watch
+
+| Test Name                   |    Nio    |   Tokio   |
+| --------------------------- | :-------: | :-------: |
+| contention_resubscribe/10   | 1.892 ms  | 808.97 µs |
+| contention_resubscribe/100  | 4.279 ms  | 3.414 ms  |
+| contention_resubscribe/500  | 15.159 ms | 14.031 ms |
+| contention_resubscribe/1000 | 26.800 ms | 26.483 ms |
+
+## timer
+
+| Test Name              |    Nio    |   Tokio   |
+| ---------------------- | :-------: | :-------: |
+| single_thread_timeout  | 62.405 ns | 45.661 ns |
+| multi_thread_timeout-8 | 16.293 ns | 30.877 ns |
+| single_thread_sleep    | 62.135 ns | 41.127 ns |
+| multi_thread_sleep-8   | 16.557 ns | 32.087 ns |

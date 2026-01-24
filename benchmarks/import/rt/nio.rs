@@ -15,6 +15,17 @@ impl Runtime {
         )
     }
 
+    pub fn timer_rt(core: usize) -> Runtime {
+        Self(
+            nio::RuntimeBuilder::new()
+                .min_tasks_per_worker(1)
+                .measurement(SimpleMeasurement::new())
+                .worker_threads(core as u8)
+                .rt()
+                .unwrap(),
+        )
+    }
+
     pub fn multi() -> Runtime {
         Self(
             nio::RuntimeBuilder::new()

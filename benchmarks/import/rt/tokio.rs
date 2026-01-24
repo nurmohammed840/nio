@@ -25,6 +25,16 @@ impl Runtime {
         Self(rt)
     }
 
+    pub fn timer_rt(core: usize) -> Runtime {
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .worker_threads(core)
+            .build()
+            .unwrap();
+        
+        Runtime(runtime)
+    }
+
     pub fn multi() -> Runtime {
         Self(
             tokio::runtime::Builder::new_multi_thread()
