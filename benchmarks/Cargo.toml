@@ -10,7 +10,7 @@ tokio = []
 pinned = []
 
 [dependencies]
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1.49", features = ["full"] }
 # nio = { path = "../libs/nio-rt", features = ["metrics"] }
 nio = { path = "../libs/nio-rt", features = [] }
 nio-metrics = { path = "../libs/nio-metrics" }

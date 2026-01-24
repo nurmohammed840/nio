@@ -15,7 +15,7 @@ const NUM_SPAWN: usize = 1_000;
 fn rt_curr_spawn_many_local(c: &mut Criterion) {
     let rt = Runtime::new(1);
 
-    c.bench_function("spawn_many_local", |b| {
+    c.bench_function("rt_spawn_many_local", |b| {
         b.iter(|| {
             rt.block_on(async {
                 let mut handles = Vec::with_capacity(NUM_SPAWN);

@@ -31,47 +31,49 @@ CPU: AMD Ryzen 7 5700 (8 Cores / 16 Threads)
 
 ## rt_current_thread
 
-| Test Name         |  Nio   | Tokio  |
-| ----------------- | :----: | :----: |
-| spawn_many_local  | 105 µs | 166 µs |
-| spawn_many_remote | 96 µs  | 165 µs |
+| Test Name              |   Nio    |   Tokio   |
+| ---------------------- | :------: | :-------: |
+| rt_spawn_many_local    | 94.34 µs | 168.89 µs |
+| spawn_many_remote_busy | 89.84 µs | 172.65 µs |
 
 
 ## rt_multi_threaded
 
-| Test Name               |  Nio   | Tokio |
-| ----------------------- | :----: | :---: |
-| spawn_many_local        | 2.5 ms |   —   |
-| spawn_many_remote       | 1.1 ms |   —   |
-| spawn_many_remote_idle  | 1.7 ms |   —   |
-| spawn_many_remote_busy1 |  1 ms  |   —   |
-| spawn_many_remote_busy2 | 126 µs |   —   |
-| ping_pong               | 347 µs |   —   |
-| yield_many              | 2.9 ms |   —   |
-| chained_spawn           | 107 µs |   —   |
+| Test Name               |    Nio    | Tokio |
+| ----------------------- | :-------: | :---: |
+| spawn_many_local        |  2.66 ms  |   —   |
+| spawn_many_remote       |  1.17 ms  |   —   |
+| spawn_many_remote_idle  |  1.60 ms  |   —   |
+| spawn_many_remote_busy1 |  1.05 ms  |   —   |
+| spawn_many_remote_busy2 |  125 µs   |   —   |
+| ping_pong               | 348.54 µs |   —   |
+| yield_many              |   3 ms    |   —   |
+| chained_spawn           | 89.57 µs  |   —   |
+
 
 ## spawn_blocking
 
 | Test Name                     |   Nio    |  Tokio   |
 | ----------------------------- | :------: | :------: |
-| spawn_blocking/concurrency/1  | 1.99 ms  | 2.89 ms  |
-| spawn_blocking/concurrency/2  | 4.13 ms  | 3.99 ms  |
-| spawn_blocking/concurrency/4  | 9.03 ms  | 10.61 ms |
-| spawn_blocking/concurrency/8  | 16.19 ms | 23.66 ms |
-| spawn_blocking/concurrency/16 | 25.87 ms | 50.29 ms |
+| spawn_blocking/concurrency/1  | 1.94 ms  | 2.93 ms  |
+| spawn_blocking/concurrency/2  | 4.24 ms  | 4.17 ms  |
+| spawn_blocking/concurrency/4  | 8.48 ms  | 10.63 ms |
+| spawn_blocking/concurrency/8  | 17.23 ms | 23.87 ms |
+| spawn_blocking/concurrency/16 | 27.57 ms | 48.96 ms |
 
 ## spawn
 
 | Test Name                     |    Nio    |   Tokio   |
 | ----------------------------- | :-------: | :-------: |
-| basic_scheduler_spawn         |  7.68 µs  |  2.26 µs  |
-| basic_scheduler_spawn_10      | 12.39 µs  |  3.83 µs  |
-| basic_scheduler_spawn_100     | 23.39 µs  | 24.34 µs  |
-| basic_scheduler_spawn_1000    | 140.52 µs | 219.70 µs |
-| threaded_scheduler_spawn      |  7.88 µs  |  3.12 µs  |
-| threaded_scheduler_spawn_10   | 23.17 µs  |  4.19 µs  |
-| threaded_scheduler_spawn_100  | 24.43 µs  | 22.89 µs  |
-| threaded_scheduler_spawn_1000 | 124.88 µs | 257.35 µs |
+| basic_scheduler_spawn         |  7.77 µs  |  2.23 µs  |
+| basic_scheduler_spawn_10      | 10.93 µs  |  4.07 µs  |
+| basic_scheduler_spawn_100     | 22.51 µs  | 24.10 µs  |
+| basic_scheduler_spawn_1000    | 130.12 µs | 221.97 µs |
+| threaded_scheduler_spawn      |  7.80 µs  |  3.11 µs  |
+| threaded_scheduler_spawn_10   | 22.94 µs  |  4.65 µs  |
+| threaded_scheduler_spawn_100  | 23.82 µs  | 24.37 µs  |
+| threaded_scheduler_spawn_1000 | 123.41 µs | 274.15 µs |
+
 
 ## sync_broadcast
 
