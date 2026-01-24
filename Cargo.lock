@@ -677,11 +677,11 @@ dependencies = [
 
 [[package]]
 name = "nio-future"
-version = "0.1.0"
+version = "0.0.1"
 
 [[package]]
 name = "nio-macros"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "quote2",
  "syn 2.0.87",
@@ -689,7 +689,7 @@ dependencies = [
 
 [[package]]
 name = "nio-metrics"
-version = "0.1.0"
+version = "0.0.0"
 
 [[package]]
 name = "nio-task"

@@ -3,5 +3,11 @@ name = "nio-threadpool"
 version = "0.1.0"
 edition = "2024"
 
+license = "Apache-2.0"
+keywords = ["threadpool"]
+authors = ["Nur <nurmohammed840@gmail.com>"]
+repository = "https://github.com/nurmohammed840/nio"
+description = "general purpose threadpool implementation"
+
 [dependencies]
 mpmc-channel = { path = "../mpmc-channel", version = "0.0.0" }

@@ -3,13 +3,19 @@ name = "nio"
 version = "0.1.0"
 edition = "2024"
 
+license = "Apache-2.0"
+keywords = ["nio", "async", "task", "runtime"]
+authors = ["Nur <nurmohammed840@gmail.com>"]
+repository = "https://github.com/nurmohammed840/nio"
+description = "Async runtime for Rust"
+
 [dependencies]
 mio = { version = "1", features = ["os-poll", "net"] }
-nio-task = { path = "../nio-task", version = "*" }
-nio-future = { path = "../nio-future", version = "*" }
-nio-threadpool = { path = "../nio-threadpool", version = "*" }
-nio-macros = { path = "../nio-macros", version = "*" }
-nio-metrics = { path = "../nio-metrics", version = "*" }
+nio-task = { path = "../nio-task", version = "0.1" }
+nio-future = { path = "../nio-future", version = "0.0.1" }
+nio-threadpool = { path = "../nio-threadpool", version = "0.1" }
+nio-macros = { path = "../nio-macros", version = "0.2" }
+nio-metrics = { path = "../nio-metrics", version = "0.0.0" }
 
 crossbeam-queue = "0.3"
 
@@ -30,11 +36,9 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
 futures-lite = { version = "2" }
-futures = "*"
+futures = "0.3"
 tokio-test = { version = "0.4.0" }
-pin-project-lite = "*"
-# bytes = { version = "1" }
-
+pin-project-lite = "0.2"
 
 [[test]]
 name = "async_io_test_suite"   # The name of the test binary

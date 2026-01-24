@@ -1,12 +1,13 @@
 [package]
 name = "nio-macros"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 
 license = "Apache-2.0"
-description = """
-Nio's proc macros.
-"""
+keywords = ["nio", "macros"]
+authors = ["Nur <nurmohammed840@gmail.com>"]
+repository = "https://github.com/nurmohammed840/nio"
+description = "procedural macros for nio"
 
 [lib]
 proc-macro = true
