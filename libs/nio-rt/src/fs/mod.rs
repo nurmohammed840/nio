@@ -6,7 +6,6 @@ macro_rules! feature {
     ) => {
         $(
             #[cfg($meta)]
-            #[cfg_attr(docsrs, doc(cfg($meta)))]
             $item
         )*
     }
@@ -17,8 +16,7 @@ macro_rules! feature {
 macro_rules! cfg_windows {
     ($($item:item)*) => {
         $(
-            #[cfg(any(all(doc, docsrs), windows))]
-            #[cfg_attr(docsrs, doc(cfg(windows)))]
+            #[cfg(windows)]
             $item
         )*
     }

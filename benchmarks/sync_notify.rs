@@ -1,7 +1,9 @@
+// #![allow(warnings)]
 use criterion::{
     criterion_group, criterion_main, measurement::WallTime, BenchmarkGroup, Criterion,
 };
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 
 use import::channel::*;
 use import::rt::*;
@@ -49,15 +51,17 @@ fn bench_notify_waiters(c: &mut Criterion) {
 fn notify_one<const N_WAITERS: usize>(g: &mut BenchmarkGroup<WallTime>) {
     let rt = rt();
 
-    static NOTIFY: Notify = Notify::const_new();
-    static COUNTER: AtomicUsize = AtomicUsize::new(0);
+    let notify = Arc::new(Notify::new());
+    let counter = Arc::new(AtomicUsize::new(0));
 
     for _ in 0..N_WAITERS {
         rt.spawn({
+            let notify = notify.clone();
+            let counter = counter.clone();
             async move {
                 loop {
-                    NOTIFY.notified().await;
-                    COUNTER.fetch_add(1, Ordering::Relaxed);
+                    notify.notified().await;
+                    counter.fetch_add(1, Ordering::Relaxed);
                 }
             }
         });
@@ -66,10 +70,10 @@ fn notify_one<const N_WAITERS: usize>(g: &mut BenchmarkGroup<WallTime>) {
     const N_ITERS: usize = 500;
     g.bench_function(N_WAITERS.to_string(), |b| {
         b.iter(|| {
-            COUNTER.store(0, Ordering::Relaxed);
+            counter.store(0, Ordering::Relaxed);
             loop {
-                NOTIFY.notify_one();
-                if COUNTER.load(Ordering::Relaxed) >= N_ITERS {
+                notify.notify_one();
+                if counter.load(Ordering::Relaxed) >= N_ITERS {
                     break;
                 }
             }
@@ -79,14 +83,18 @@ fn notify_one<const N_WAITERS: usize>(g: &mut BenchmarkGroup<WallTime>) {
 
 fn notify_waiters<const N_WAITERS: usize>(g: &mut BenchmarkGroup<WallTime>) {
     let rt = rt();
-    static NOTIFY: Notify = Notify::const_new();
-    static COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+    let notify = Arc::new(Notify::new());
+    let counter = Arc::new(AtomicUsize::new(0));
+
     for _ in 0..N_WAITERS {
         rt.spawn({
+            let notify = notify.clone();
+            let counter = counter.clone();
             async move {
                 loop {
-                    NOTIFY.notified().await;
-                    COUNTER.fetch_add(1, Ordering::Relaxed);
+                    notify.notified().await;
+                    counter.fetch_add(1, Ordering::Relaxed);
                 }
             }
         });
@@ -95,13 +103,15 @@ fn notify_waiters<const N_WAITERS: usize>(g: &mut BenchmarkGroup<WallTime>) {
     const N_ITERS: usize = 500;
     g.bench_function(N_WAITERS.to_string(), |b| {
         b.iter(|| {
-            COUNTER.store(0, Ordering::Relaxed);
+            counter.store(0, Ordering::Relaxed);
             loop {
-                NOTIFY.notify_waiters();
-                if COUNTER.load(Ordering::Relaxed) >= N_ITERS {
+                notify.notify_waiters();
+                if counter.load(Ordering::Relaxed) >= N_ITERS {
                     break;
                 }
             }
         })
     });
+
+    // rt.print_measurement();
 }

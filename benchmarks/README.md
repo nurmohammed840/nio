@@ -1,3 +1,7 @@
+# Benchmarking `nio::spawn` vs `tokio::spawn`
+
+This benchmark suite ported from [Tokio Benchmarks](https://github.com/tokio-rs/tokio/tree/master/benches).
+
 ## Run Benchmark
 
 ```sh
@@ -79,11 +83,10 @@ CPU: AMD Ryzen 7 5700 (8 Cores / 16 Threads)
 
 | Test Name       |    Nio    |   Tokio   |
 | --------------- | :-------: | :-------: |
-| contention/10   | 1.898 ms  | 1.834 ms  |
-| contention/100  | 4.501 ms  | 4.935 ms  |
-| contention/500  | 15.574 ms | 15.804 ms |
-| contention/1000 | 30.954 ms | 29.251 ms |
-
+| contention/10   | 1.8978 ms | 1.8195 ms |
+| contention/100  | 4.4701 ms | 5.0437 ms |
+| contention/500  | 16.237 ms | 15.982 ms |
+| contention/1000 | 32.512 ms | 29.558 ms |
 
 ## sync_mpsc_oneshot
 
@@ -103,18 +106,38 @@ CPU: AMD Ryzen 7 5700 (8 Cores / 16 Threads)
 
 ## sync_notify
 
-| Test Name          |    Nio    |   Tokio   |
-| ------------------ | :-------: | :-------: |
-| notify_one/10      | 121.73 µs | 91.541 µs |
-| notify_one/50      | 204.25 µs | 90.457 µs |
-| notify_one/100     | 192.81 µs | 87.222 µs |
-| notify_one/200     | 202.02 µs | 86.915 µs |
-| notify_one/500     | 198.40 µs | 85.629 µs |
-| notify_waiters/10  | 136.45 µs | 128.23 µs |
-| notify_waiters/50  | 198.11 µs | 125.44 µs |
-| notify_waiters/100 | 215.11 µs | 124.70 µs |
-| notify_waiters/200 | 263.39 µs | 125.58 µs |
-| notify_waiters/500 | 329.58 µs | 125.25 µs |
+| Test Name          | Nio (`min_tasks_per_worker = 3`) |   Tokio   |
+| ------------------ | :------------------------------: | :-------: |
+| notify_one/10      |            109.85 µs             | 95.904 µs |
+| notify_one/50      |            166.73 µs             | 98.382 µs |
+| notify_one/100     |            162.75 µs             | 99.523 µs |
+| notify_one/200     |            165.19 µs             | 101.13 µs |
+| notify_one/500     |            165.06 µs             | 111.58 µs |
+| notify_waiters/10  |            138.60 µs             | 119.40 µs |
+| notify_waiters/50  |            131.98 µs             | 118.88 µs |
+| notify_waiters/100 |            120.47 µs             | 122.05 µs |
+| notify_waiters/200 |            119.87 µs             | 118.65 µs |
+| notify_waiters/500 |            126.29 µs             | 122.24 µs |
+
+
+In this benchmark, Nio shows slightly slower performance compared to Tokio.
+The irony is that Nio is “too fast”. drain task queue immediately and goto sleep, and later wake up again.
+
+The task do nothing except waiting for notification. To make nio look good, we can add some computation so worker are kept busy,
+Or increase `min_tasks_per_worker` setting to reduce the sleep/wake cycle.
+
+| Test Name          | Nio (`min_tasks_per_worker = 10`) |   Tokio   |
+| ------------------ | :-------------------------------: | :-------: |
+| notify_one/10      |             49.994 µs             | 94.787 µs |
+| notify_one/50      |             99.259 µs             | 96.856 µs |
+| notify_one/100     |             96.827 µs             | 99.122 µs |
+| notify_one/200     |             101.46 µs             | 102.59 µs |
+| notify_one/500     |             94.831 µs             | 103.83 µs |
+| notify_waiters/10  |             188.09 µs             | 119.98 µs |
+| notify_waiters/50  |             88.836 µs             | 123.14 µs |
+| notify_waiters/100 |             107.37 µs             | 120.03 µs |
+| notify_waiters/200 |             119.29 µs             | 123.29 µs |
+| notify_waiters/500 |             123.69 µs             | 125.97 µs |
 
 ## sync_watch
 
