@@ -121,10 +121,10 @@ CPU: AMD Ryzen 7 5700 (8 Cores / 16 Threads)
 
 
 In this benchmark, Nio shows slightly slower performance compared to Tokio.
-The irony is that Nio is “too fast”. drain task queue immediately and goto sleep, and later wake up again.
+The irony is that Nio is “too fast”. Nio drain task queue immediately and goto sleep, and then later wake up again.
 
 The task do nothing except waiting for notification. To make nio look good, we can add some computation so worker are kept busy,
-Or increase `min_tasks_per_worker` setting to reduce the sleep/wake cycle.
+Or increase `min_tasks_per_worker` setting to reduce the frequency of sleep/wake cycle.
 
 | Test Name          | Nio (`min_tasks_per_worker = 10`) |   Tokio   |
 | ------------------ | :-------------------------------: | :-------: |

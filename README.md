@@ -1,12 +1,13 @@
 ## Nio
 
-Nio is an experimental async runtime for Rust.
-For more information, check out [this article](https://nurmohammed840.github.io/posts/announcing-nio/)
-
-Nio focuses solely on providing an async runtime, It doesn't include additional utilities like. `io`, `sync`,
-You'll still need to rely on libraries like `tokio` for everything else.
+Nio is async runtime for Rust.
 
 ## Example
+
+```toml
+[dependencies]
+nio = "0.1"
+```
 
 Here is a basic echo server example:
 
