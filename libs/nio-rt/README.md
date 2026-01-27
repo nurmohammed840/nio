@@ -1,5 +1,6 @@
 [![Documentation](https://docs.rs/nio/badge.svg)](https://docs.rs/nio)
 [![Crates.io](https://img.shields.io/crates/v/nio.svg)](https://crates.io/crates/nio)
+[![CI](https://github.com/nurmohammed840/nio/actions/workflows/ci.yml/badge.svg)](https://github.com/nurmohammed840/nio/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/license/apache-2-0)
 
 ## Nio

@@ -658,7 +658,7 @@ version = "0.0.0"
 
 [[package]]
 name = "nio"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "crossbeam-queue",
  "futures",
