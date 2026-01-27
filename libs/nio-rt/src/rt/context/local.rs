@@ -52,6 +52,10 @@ impl LocalContext {
         LocalContext::with(Rc::clone)
     }
 
+    pub fn worker_id(&self) -> WorkerId {
+        self.worker_id
+    }
+
     pub fn spawn_local<Fut>(&self, future: Fut) -> JoinHandle<Fut::Output>
     where
         Fut: Future + 'static,

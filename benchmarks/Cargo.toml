@@ -65,11 +65,6 @@ path = "sync_notify.rs"
 harness = false
 
 [[bench]]
-name = "sync_semaphore"
-path = "sync_semaphore.rs"
-harness = false
-
-[[bench]]
 name = "sync_watch"
 path = "sync_watch.rs"
 harness = false

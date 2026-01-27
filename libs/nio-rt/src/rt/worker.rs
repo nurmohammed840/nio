@@ -28,7 +28,7 @@ pub struct Workers {
     notifiers: Box<[driver::Waker]>,
     shared_queues: Box<[SharedQueue]>,
     pub(crate) task_queues: Box<[TaskQueue]>,
-    pub(crate) min_tasks_per_worker: usize,
+    pub(crate) min_tasks_per_worker: u64,
 }
 
 impl Workers {
@@ -45,11 +45,10 @@ impl Workers {
     pub fn least_loaded_worker(&self) -> WorkerId {
         unsafe {
             // Safety: `task_counters` is not empty
-            let id = find_index_of_lowest(
-                &self.task_queues,
-                self.min_tasks_per_worker as u64,
-                |counter| counter.load().total(),
-            );
+            let id =
+                find_index_of_lowest(&self.task_queues, self.min_tasks_per_worker, |counter| {
+                    counter.load().total()
+                });
             debug_assert!(self.task_queues.get(id).is_some());
             WorkerId(id as u8)
         }
@@ -71,7 +70,7 @@ impl Workers {
 }
 
 impl Workers {
-    pub fn new(count: u8, min_tasks_per_worker: usize) -> io::Result<(Self, Box<[Driver]>)> {
+    pub fn new(count: u8, min_tasks_per_worker: u64) -> io::Result<(Self, Box<[Driver]>)> {
         let mut drivers = Vec::with_capacity(count as usize);
         let mut notifier = Vec::with_capacity(count as usize);
 

@@ -1,3 +1,5 @@
+#[doc = include_str!("../README.md")]
+
 pub mod fs;
 pub mod net;
 
@@ -17,6 +19,7 @@ pub use rt::{
     Runtime,
     context::{LocalContext, RuntimeContext},
     metrics,
+    WorkerId
 };
 pub use timer::{
     interval::{Interval, interval},
@@ -32,7 +35,7 @@ pub struct RuntimeBuilder {
     worker_name: Box<dyn Fn(u8) -> String + Send + Sync>,
 
     event_interval: u32,
-    min_tasks_per_worker: Option<NonZero<usize>>,
+    min_tasks_per_worker: Option<NonZero<u64>>,
 
     threadpool_load_factor: usize,
     max_blocking_threads: u16,
@@ -103,7 +106,8 @@ impl RuntimeBuilder {
     }
 
     pub fn min_tasks_per_worker(mut self, count: usize) -> Self {
-        self.min_tasks_per_worker = NonZero::new(count);
+        assert_ne!(count, 0);
+        self.min_tasks_per_worker = NonZero::new(count.try_into().unwrap());
         self
     }
 
