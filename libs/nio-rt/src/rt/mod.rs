@@ -1,18 +1,21 @@
 pub mod context;
+mod event_loop;
 pub mod metrics;
 pub mod task;
 mod task_queue;
 mod worker;
 
-use crate::{RuntimeBuilder, driver};
+use crate::{RuntimeBuilder, driver, rt::event_loop::EventLoop};
 use std::{io, sync::Arc, thread};
 
 use nio_threadpool::ThreadPool;
 
-use context::{LocalContext, RuntimeContext};
+use context::RuntimeContext;
 use worker::Workers;
 
 pub use worker::WorkerId;
+
+const LOCAL_QUEUE_CAP: usize = 512;
 
 impl RuntimeBuilder {
     pub fn rt(mut self) -> io::Result<Runtime> {
@@ -38,22 +41,15 @@ impl RuntimeBuilder {
                 .name(self.thread_name.take().unwrap()),
         });
 
-        let local_queue_cap: usize = 512;
-        let event_interval = self.event_interval;
+        let tick = self.event_interval;
 
         for (id, driver) in drivers.into_iter().enumerate() {
             let id = id as u8;
-            let context = context.clone();
-            let worker_id = context.workers.id(id);
+            let runtime_ctx = context.clone();
 
             self.create_thread(id)
                 .spawn(move || {
-                    let io_registry = driver.registry_owned().unwrap();
-                    Workers::job(
-                        LocalContext::new(worker_id, local_queue_cap, context, io_registry),
-                        event_interval,
-                        driver,
-                    )
+                    EventLoop::new(id, driver, runtime_ctx, tick, LOCAL_QUEUE_CAP).run();
                 })
                 .unwrap_or_else(|err| panic!("failed to spawn worker thread {id}; {err}"));
         }
