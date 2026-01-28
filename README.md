@@ -5,7 +5,7 @@
 
 ## Nio
 
-Nio is an async runtime for Rust.
+Nio is a [Thread-Per-Core](https://nurmohammed840.github.io/posts/embracing-thread-per-core-architecture/) async runtime for Rust.
 
 ## Task spawning APIs
 
@@ -17,6 +17,8 @@ Nio uses multiple worker threads to execute tasks.
 | `nio::spawn_pinned`    | Only captured variables | Pinned to one worker thread (selected by the runtime based on load) |
 | `nio::spawn_pinned_at` | Only captured variables | Pinned to a specific worker thread (by index)                       |
 | `nio::spawn`           |     `Send` required     | Not pinned, may move between threads at `.await` points             |
+
+Note: `nio::spawn_pinned`, `nio::spawn_pinned_at` accept async closures, Only captured variables required to be `Send`, task itself is `!Send`.
 
 ## Example
 
