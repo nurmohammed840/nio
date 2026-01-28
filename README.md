@@ -7,12 +7,25 @@
 
 Nio is an async runtime for Rust.
 
+## Task spawning APIs
+
+Nio uses multiple worker threads to execute tasks.
+
+| Function               |   `Send` requirement    | Thread affinity                                                     |
+| ---------------------- | :---------------------: | ------------------------------------------------------------------- |
+| `nio::spawn_local`     |    `!Send`  allowed     | Pinned to current thread                                            |
+| `nio::spawn_pinned`    | Only captured variables | Pinned to one worker thread (selected by the runtime based on load) |
+| `nio::spawn_pinned_at` | Only captured variables | Pinned to a specific worker thread (by index)                       |
+| `nio::spawn`           |     `Send` required     | Not pinned, may move between threads at `.await` points             |
+
 ## Example
 
 ```toml
 [dependencies]
-nio = "0.1"
+nio = { version = "0.1", features = ["tokio-io"] }
 ```
+
+By default, Nio implements async traits from [futures-io](https://docs.rs/futures-io/latest/futures_io/). But the optional "tokio-io" feature implements async traits from [tokio::io](https://docs.rs/tokio/latest/tokio/io/).
 
 Here is a basic echo server example:
 
@@ -31,6 +44,7 @@ async fn main() -> Result<()> {
         println!("[INCOMING] {:?}", conn.peer_addr());
 
         let accept = || async {
+            // Accept the connection on different worker thread
             let mut stream = conn.connect().await?;
             let mut buf = vec![0; 1024];
             while let Ok(n) = stream.read(&mut buf).await {
