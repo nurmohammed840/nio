@@ -1,9 +1,10 @@
 use crate::{
     LocalContext, RuntimeContext,
     driver::{self, Driver},
+    rt::task_queue::TaskQueue,
 };
 use nio_task::Status;
-use std::{io, rc::Rc, sync::Arc, time::Duration};
+use std::{io, ops::ControlFlow, rc::Rc, sync::Arc, time::Duration};
 
 pub struct EventLoop {
     tick: u32,
@@ -12,7 +13,7 @@ pub struct EventLoop {
 }
 
 impl EventLoop {
-    pub(crate) fn new(
+    pub fn new(
         id: u8,
         driver: driver::Driver,
         runtime_ctx: Arc<RuntimeContext>,
@@ -30,24 +31,36 @@ impl EventLoop {
         }
     }
 
-    pub(crate) fn run(&mut self) {
+    pub fn run(&mut self) {
+        self.run_with(Self::execute_tasks);
+    }
+
+    pub fn execute_tasks(&self, task_queue: &TaskQueue) -> ControlFlow<(), ()> {
+        for _ in 0..self.tick {
+            let Some(task) = (unsafe { self.local_ctx.local_queue(|q| q.pop_front()) }) else {
+                break;
+            };
+            match task.poll() {
+                Status::Yielded(task) => {
+                    unsafe { self.local_ctx.local_queue(|q| q.push_back(task)) };
+                }
+                Status::Pending | Status::Complete(_) => {
+                    let counter = task_queue.decrease_local();
+                    self.local_ctx
+                        .move_tasks_from_shared_to_local_queue(counter);
+                }
+            }
+        }
+        ControlFlow::Continue(())
+    }
+
+    pub fn run_with<T>(&mut self, process_tasks: fn(&Self, &TaskQueue) -> ControlFlow<T, ()>) -> T {
         let task_queue = self.local_ctx.task_queue();
 
         loop {
-            for _ in 0..self.tick {
-                let Some(task) = (unsafe { self.local_ctx.local_queue(|q| q.pop_front()) }) else {
-                    break;
-                };
-                match task.poll() {
-                    Status::Yielded(task) => {
-                        unsafe { self.local_ctx.local_queue(|q| q.push_back(task)) };
-                    }
-                    Status::Pending | Status::Complete(_) => {
-                        let counter = task_queue.decrease_local();
-                        self.local_ctx
-                            .move_tasks_from_shared_to_local_queue(counter);
-                    }
-                }
+            match process_tasks(self, task_queue) {
+                ControlFlow::Break(val) => return val,
+                ControlFlow::Continue(_) => {}
             }
 
             let expired_timers = unsafe {
