@@ -12,13 +12,13 @@ impl<T: panic::RefUnwindSafe + ?Sized> panic::UnwindSafe for ThinArc<T> {}
 unsafe impl<T: ?Sized + Sync + Send> Send for ThinArc<T> {}
 unsafe impl<T: ?Sized + Sync + Send> Sync for ThinArc<T> {}
 
-impl ThinArc<dyn RawTaskVTable> {
+impl<'a> ThinArc<dyn RawTaskVTable + 'a> {
     #[inline]
-    pub fn new<Data>(this: Box<RawTaskHeader<Data>>) -> (Self, Self)
+    pub fn new<Data: 'a>(this: Box<RawTaskHeader<Data>>) -> (Self, Self)
     where
-        RawTaskHeader<Data>: RawTaskVTable + 'static,
+        RawTaskHeader<Data>: RawTaskVTable,
     {
-        let ptr: NonNull<dyn RawTaskVTable + 'static> = NonNull::from(Box::leak(this));
+        let ptr: NonNull<dyn RawTaskVTable + 'a> = NonNull::from(Box::leak(this));
         unsafe { (ThinArc::from_inner(ptr), ThinArc::from_inner(ptr)) }
     }
 }
@@ -62,18 +62,18 @@ impl<Data: ?Sized> ThinArc<Data> {
     }
 }
 
-impl<T: RawTaskVTable + 'static> ThinArc<T> {
+impl<'a, T: RawTaskVTable + 'a> ThinArc<T> {
     /// We need to manually impl `erase`
     /// as we can't impl `CoerceUnsized` on stable rust
     ///
     /// https://doc.rust-lang.org/std/ops/trait.CoerceUnsized.html
-    pub fn erase(this: ThinArc<T>) -> ThinArc<dyn RawTaskVTable> {
+    pub fn erase(this: ThinArc<T>) -> ThinArc<dyn RawTaskVTable + 'a> {
         let this = ManuallyDrop::new(this);
         unsafe { ThinArc::from_inner(this.ptr) }
     }
 
     // same as: https://doc.rust-lang.org/std/sync/struct.Arc.html#method.downcast_unchecked
-    pub unsafe fn concrete(this: ThinArc<dyn RawTaskVTable>) -> ThinArc<T> {
+    pub unsafe fn concrete(this: ThinArc<dyn RawTaskVTable + 'a>) -> ThinArc<T> {
         let this = ManuallyDrop::new(this);
         unsafe { ThinArc::from_inner(this.ptr.cast()) }
     }
