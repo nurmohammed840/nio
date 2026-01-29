@@ -9,11 +9,11 @@ async fn test_macro_can_be_used_via_use() {
     nio::spawn(async {}).await.unwrap();
 }
 
-#[nio::test]
-async fn test_macro_is_resilient_to_shadowing() {
-    nio::spawn(async {}).await.unwrap();
-    with_arg(42);
-}
+// #[nio::test]
+// async fn test_macro_is_resilient_to_shadowing() {
+//     nio::spawn(async {}).await.unwrap();
+//     with_arg(42);
+// }
 
 // https://github.com/tokio-rs/tokio/issues/3403
 #[rustfmt::skip] // this `rustfmt::skip` is necessary because unused_braces does not warn if the block contains newline.

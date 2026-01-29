@@ -5,8 +5,8 @@ pub mod task;
 mod task_queue;
 mod worker;
 
-use crate::{RuntimeBuilder, driver, rt::event_loop::EventLoop};
-use std::{io, sync::Arc, thread};
+use crate::{LocalContext, RuntimeBuilder, driver, rt::event_loop::EventLoop};
+use std::{io, rc::Rc, sync::Arc, thread};
 
 use nio_threadpool::ThreadPool;
 
@@ -55,6 +55,76 @@ impl RuntimeBuilder {
         }
 
         Ok(Runtime { context })
+    }
+
+    pub fn build(mut self) -> io::Result<LocalRuntime> {
+        let min_tasks_per_worker = match self.min_tasks_per_worker {
+            Some(count) => count.get(),
+            None => (self.worker_threads as u64 / 2).max(1),
+        };
+
+        let (workers, drivers) = Workers::new(self.worker_threads, min_tasks_per_worker)?;
+        let runtime_ctx = Arc::new(RuntimeContext {
+            workers,
+            #[cfg(feature = "metrics")]
+            measurement: {
+                let mut metrics = self.measurement.take().unwrap();
+                metrics.init(self.worker_threads.into());
+                metrics
+            },
+            threadpool: ThreadPool::new()
+                .max_threads_limit(self.max_blocking_threads)
+                .load_factor(self.threadpool_load_factor)
+                .stack_size(self.thread_stack_size)
+                .timeout(self.thread_timeout)
+                .name(self.thread_name.take().unwrap()),
+        });
+
+        let tick = self.event_interval;
+        let mut drivers = drivers.into_iter().enumerate();
+
+        let (id, driver) = drivers.next().unwrap();
+        let main_event_loop =
+            EventLoop::new(id as u8, driver, runtime_ctx.clone(), tick, LOCAL_QUEUE_CAP);
+
+        for (id, driver) in drivers {
+            let id = id as u8;
+            let runtime_ctx = runtime_ctx.clone();
+
+            self.create_thread(id)
+                .spawn(move || {
+                    EventLoop::new(id, driver, runtime_ctx, tick, LOCAL_QUEUE_CAP).run();
+                })
+                .unwrap_or_else(|err| panic!("failed to spawn worker thread {id}; {err}"));
+        }
+
+        Ok(LocalRuntime { main_event_loop })
+    }
+}
+
+pub struct LocalRuntime {
+    main_event_loop: EventLoop,
+}
+
+impl LocalRuntime {
+    pub fn local_context(&self) -> Rc<LocalContext> {
+        self.main_event_loop.local_ctx.clone()
+    }
+
+    pub fn runtime_context(&self) -> Arc<RuntimeContext> {
+        self.main_event_loop.local_ctx.runtime_ctx.clone()
+    }
+
+    pub fn block_on<Fut: Future>(&mut self, fut: Fut) -> Fut::Output {
+        self.main_event_loop.run_until(fut)
+    }
+}
+
+impl std::ops::Deref for LocalRuntime {
+    type Target = LocalContext;
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.main_event_loop.local_ctx
     }
 }
 
