@@ -658,7 +658,7 @@ version = "0.0.0"
 
 [[package]]
 name = "nio"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "crossbeam-queue",
  "crossbeam-utils",
@@ -682,7 +682,7 @@ version = "0.0.1"
 
 [[package]]
 name = "nio-macros"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "quote2",
  "syn 2.0.87",

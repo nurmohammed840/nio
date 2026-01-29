@@ -1,15 +1,22 @@
 use crate::{
     LocalContext, RuntimeContext,
     driver::{self, Driver},
-    rt::{context::NioContext, task_queue::TaskQueue},
+    rt::{context::NioContext, task::LocalScheduler, task_queue::TaskQueue},
 };
 use nio_task::Status;
-use std::{io, ops::ControlFlow, rc::Rc, sync::Arc, time::Duration};
+use std::{
+    io,
+    ops::ControlFlow,
+    rc::Rc,
+    sync::Arc,
+    task::{Context, Poll, Waker},
+    time::Duration,
+};
 
 pub struct EventLoop {
     tick: u32,
     driver: Driver,
-    local_ctx: Rc<LocalContext>,
+    pub local_ctx: Rc<LocalContext>,
 }
 
 impl EventLoop {
@@ -28,6 +35,53 @@ impl EventLoop {
             tick,
             driver,
             local_ctx,
+        }
+    }
+
+    pub fn run_until<Fut: Future>(&mut self, fut: Fut) -> Fut::Output {
+        let (task, jh) = unsafe {
+            LocalScheduler::spawn(
+                self.local_ctx.worker_id,
+                self.local_ctx.runtime_ctx.clone(),
+                fut,
+            )
+        };
+
+        let task_id = task.id();
+        self.local_ctx.add_task_to_local_queue(task);
+
+        self.run_with(|this, task_queue| {
+            for _ in 0..this.tick {
+                let Some(task) = (unsafe { this.local_ctx.local_queue(|q| q.pop_front()) }) else {
+                    break;
+                };
+                match task.poll() {
+                    Status::Yielded(task) => {
+                        unsafe { this.local_ctx.local_queue(|q| q.push_back(task)) };
+                    }
+                    Status::Pending => {
+                        let counter = task_queue.decrease_local();
+                        this.local_ctx
+                            .move_tasks_from_shared_to_local_queue(counter);
+                    }
+                    Status::Complete(meta) => {
+                        let counter = task_queue.decrease_local();
+                        this.local_ctx
+                            .move_tasks_from_shared_to_local_queue(counter);
+
+                        if meta.id() == task_id {
+                            return ControlFlow::Break(());
+                        }
+                    }
+                }
+            }
+            ControlFlow::Continue(())
+        });
+
+        let jh = std::pin::pin!(jh);
+        match jh.poll(&mut Context::from_waker(Waker::noop())) {
+            Poll::Ready(result) => result.unwrap(),
+            Poll::Pending => unreachable!(),
         }
     }
 
@@ -54,7 +108,7 @@ impl EventLoop {
         ControlFlow::Continue(())
     }
 
-    pub fn run_with(&mut self, process_tasks: fn(&Self, &TaskQueue) -> ControlFlow<(), ()>) {
+    pub fn run_with(&mut self, process_tasks: impl Fn(&Self, &TaskQueue) -> ControlFlow<(), ()>) {
         let task_queue = self.local_ctx.task_queue();
 
         loop {

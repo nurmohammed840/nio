@@ -5,7 +5,7 @@
 
 ## Nio
 
-Nio is an async runtime for Rust.
+Nio is a [Thread-Per-Core](https://nurmohammed840.github.io/posts/embracing-thread-per-core-architecture/) async runtime for Rust.
 
 ## Task spawning APIs
 
@@ -18,12 +18,13 @@ Nio uses multiple worker threads to execute tasks.
 | `nio::spawn_pinned_at` | Only captured variables | Pinned to a specific worker thread (by index)                       |
 | `nio::spawn`           |     `Send` required     | Not pinned, may move between threads at `.await` points             |
 
+Note: `nio::spawn_pinned`, `nio::spawn_pinned_at` accept async closure, Only captured variables required to be `Send`, task itself is `!Send`.
 
 ## Example
 
 ```toml
 [dependencies]
-nio = { version = "0.1", features = ["tokio-io"] }
+nio = { version = "0.1.3", features = ["tokio-io"] }
 ```
 
 By default, Nio implements async traits from [futures-io](https://docs.rs/futures-io/latest/futures_io/). But the optional "tokio-io" feature implements async traits from [tokio::io](https://docs.rs/tokio/latest/tokio/io/).

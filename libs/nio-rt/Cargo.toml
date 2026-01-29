@@ -1,6 +1,6 @@
 [package]
 name = "nio"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2024"
 
 license = "Apache-2.0"
@@ -13,7 +13,7 @@ description = "Async runtime for Rust"
 nio-task = { path = "../nio-task", version = "0.2" }
 nio-future = { path = "../nio-future", version = "0.0.1" }
 nio-threadpool = { path = "../nio-threadpool", version = "0.1" }
-nio-macros = { path = "../nio-macros", version = "0.2" }
+nio-macros = { path = "../nio-macros", version = "0.3" }
 nio-metrics = { path = "../nio-metrics", version = "0.0.0" }
 
 mio = { version = "1", features = ["os-poll", "net"] }

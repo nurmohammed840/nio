@@ -99,9 +99,9 @@ pub fn nio_main(
             #crate_path::RuntimeBuilder::new()
                 #test_config
                 #config
-                .rt()
+                .build()
                 .unwrap()
-                .block_on(|| #async_keyword move #body)
+                .block_on(#async_keyword move #body)
         }
     });
     out
