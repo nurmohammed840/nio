@@ -21,7 +21,7 @@ pub struct RawTaskInner<F: Future, S: Scheduler<M>, M> {
 impl<F, S, M> RawTaskVTable for RawTaskHeader<RawTaskInner<F, S, M>>
 where
     M: 'static,
-    F: Future + 'static,
+    F: Future,
     S: Scheduler<M>,
 {
     #[inline]
@@ -119,20 +119,20 @@ where
 impl<F, S, M> RawTaskHeader<RawTaskInner<F, S, M>>
 where
     M: 'static,
-    F: Future + 'static,
+    F: Future,
     S: Scheduler<M>,
 {
     unsafe fn schedule_by_ref(this: &ThinArc<Self>) {
         this.data
             .scheduler
-            .schedule(Task::from_raw(ThinArc::erase(this.clone())));
+            .schedule(Task::from_raw(ThinArc::erase_lifetime(this.clone())));
     }
 }
 
 impl<F, S, M> ArcWaker for RawTaskHeader<RawTaskInner<F, S, M>>
 where
     M: 'static,
-    F: Future + 'static,
+    F: Future,
     S: Scheduler<M>,
 {
     fn wake(this: ThinArc<Self>) {

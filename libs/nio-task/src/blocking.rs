@@ -20,12 +20,14 @@ impl BlockingTask {
         F: FnOnce() -> T + Send + 'static,
         T: Send + 'static,
     {
-        let (raw, join) = ThinArc::new(Box::new(RawTaskHeader {
-            header: Header::new(),
-            data: BlockingRawTask {
-                func: UnsafeCell::new(Fut::Future(f)),
-            },
-        }));
+        let (raw, join) = unsafe {
+            ThinArc::new(Box::new(RawTaskHeader {
+                header: Header::new(),
+                data: BlockingRawTask {
+                    func: UnsafeCell::new(Fut::Future(f)),
+                },
+            }))
+        };
         (BlockingTask { raw }, JoinHandle::new(join))
     }
 

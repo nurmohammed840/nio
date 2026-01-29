@@ -137,7 +137,7 @@ impl<M> Task<M> {
     where
         M: 'static,
         S: Scheduler<M>,
-        F: Future + 'static,
+        F: Future,
     {
         let (raw, join) = ThinArc::new(Box::new(RawTaskHeader {
             header: Header::new(),

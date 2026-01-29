@@ -694,7 +694,7 @@ version = "0.0.0"
 
 [[package]]
 name = "nio-task"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "atomic-waker",
  "easy-parallel",
