@@ -30,10 +30,26 @@ impl NioContext {
         }
     }
 
+    #[inline(never)]
+    fn panic_if_local_ctx_not_found(&self) {
+        match self {
+            NioContext::Runtime(_) => panic!("expected local runtime, found global runtime"),
+            NioContext::None => panic!("no local runtime exist"),
+            NioContext::Local(_) => {}
+        }
+    }
+
     fn init(local: Rc<LocalContext>) {
         CONTEXT.with(|ctx| unsafe {
             (*ctx.get()).panic_if_exist();
             *ctx.get() = NioContext::Local(local)
+        });
+    }
+
+    pub fn drop_local_context() {
+        CONTEXT.with(|ctx| unsafe {
+            (*ctx.get()).panic_if_local_ctx_not_found();
+            *ctx.get() = NioContext::None
         });
     }
 

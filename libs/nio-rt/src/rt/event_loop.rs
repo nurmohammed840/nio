@@ -1,7 +1,7 @@
 use crate::{
     LocalContext, RuntimeContext,
     driver::{self, Driver},
-    rt::task_queue::TaskQueue,
+    rt::{context::NioContext, task_queue::TaskQueue},
 };
 use nio_task::Status;
 use std::{io, ops::ControlFlow, rc::Rc, sync::Arc, time::Duration};
@@ -54,7 +54,7 @@ impl EventLoop {
         ControlFlow::Continue(())
     }
 
-    pub fn run_with<T>(&mut self, process_tasks: fn(&Self, &TaskQueue) -> ControlFlow<T, ()>) -> T {
+    pub fn run_with(&mut self, process_tasks: fn(&Self, &TaskQueue) -> ControlFlow<(), ()>) {
         let task_queue = self.local_ctx.task_queue();
 
         loop {
@@ -128,5 +128,11 @@ impl EventLoop {
                 unsafe { (*ptr).notify(event) };
             }
         }
+    }
+}
+
+impl Drop for EventLoop {
+    fn drop(&mut self) {
+        NioContext::drop_local_context();
     }
 }
