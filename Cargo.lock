@@ -661,6 +661,7 @@ name = "nio"
 version = "0.1.2"
 dependencies = [
  "crossbeam-queue",
+ "crossbeam-utils",
  "futures",
  "futures-io",
  "futures-lite",

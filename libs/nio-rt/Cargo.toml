@@ -10,14 +10,15 @@ repository = "https://github.com/nurmohammed840/nio"
 description = "Async runtime for Rust"
 
 [dependencies]
-mio = { version = "1", features = ["os-poll", "net"] }
 nio-task = { path = "../nio-task", version = "0.1" }
 nio-future = { path = "../nio-future", version = "0.0.1" }
 nio-threadpool = { path = "../nio-threadpool", version = "0.1" }
 nio-macros = { path = "../nio-macros", version = "0.2" }
 nio-metrics = { path = "../nio-metrics", version = "0.0.0" }
 
+mio = { version = "1", features = ["os-poll", "net"] }
 crossbeam-queue = "0.3"
+crossbeam-utils = "0.8"
 
 futures-io = { version = "0.3", optional = true }
 tokio = { version = "1", default-features = false, optional = true }

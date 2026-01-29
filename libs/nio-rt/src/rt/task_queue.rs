@@ -1,3 +1,4 @@
+use crossbeam_utils::CachePadded;
 use std::{
     fmt,
     sync::atomic::{AtomicU64, Ordering},
@@ -27,7 +28,7 @@ const NOTIFIED_FLAG: u64 = 1 << SHARED_COUNTER_BIT_SIZE;
 const LOCAL_COUNTER_ONE: u64 = 1 << LOCAL_COUNTER_BIT_SIZE;
 
 pub struct TaskQueue {
-    counter: AtomicU64,
+    counter: CachePadded<AtomicU64>,
 }
 
 #[derive(Clone, Copy)]
@@ -64,7 +65,7 @@ impl Counter {
 impl TaskQueue {
     pub fn new() -> Self {
         Self {
-            counter: AtomicU64::new(0),
+            counter: CachePadded::new(AtomicU64::new(0)),
         }
     }
 
