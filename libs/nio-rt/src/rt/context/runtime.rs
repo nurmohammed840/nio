@@ -60,7 +60,7 @@ impl RuntimeContext {
         Fut::Output: Send + 'static,
     {
         let id = self.workers.id(id);
-        let (task, join) = LocalScheduler::spawn(id, self.clone(), future());
+        let (task, join) = unsafe { LocalScheduler::spawn(id, self.clone(), future()) };
         self.send_task_at(id, task);
         join
     }
@@ -72,7 +72,7 @@ impl RuntimeContext {
         Fut::Output: Send + 'static,
     {
         let id = self.workers.least_loaded_worker();
-        let (task, join) = LocalScheduler::spawn(id, self.clone(), future());
+        let (task, join) = unsafe { LocalScheduler::spawn(id, self.clone(), future()) };
         self.send_task_at(id, task);
         join
     }

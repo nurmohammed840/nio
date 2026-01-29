@@ -23,15 +23,12 @@ impl nio_task::Scheduler for LocalScheduler {
 }
 
 impl LocalScheduler {
-    pub fn spawn<F>(
+    /// SAFETY: The caller must ensure that future outlive task
+    pub unsafe fn spawn<F: Future>(
         pinned: WorkerId,
         runtime_ctx: Arc<RuntimeContext>,
         future: F,
-    ) -> (Task, JoinHandle<F::Output>)
-    where
-        F: Future + 'static,
-        F::Output: 'static,
-    {
+    ) -> (Task, JoinHandle<F::Output>) {
         let future = LocalFuture {
             worker_id: pinned,
             fut: ManuallyDrop::new(future),

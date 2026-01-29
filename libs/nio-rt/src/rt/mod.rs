@@ -70,10 +70,13 @@ impl Runtime {
     pub fn block_on<F, Fut>(&self, fut: F) -> Fut::Output
     where
         F: FnOnce() -> Fut + Send,
-        Fut: Future + 'static,
-        Fut::Output: Send + 'static,
+        Fut: Future,
+        Fut::Output: Send,
     {
-        nio_future::block_on(self.context.spawn_pinned_at(0, fut)).unwrap()
+        let id = self.context.workers.id(0);
+        let (task, join) = unsafe { task::LocalScheduler::spawn(id, self.context.clone(), fut()) };
+        self.context.send_task_at(id, task);
+        nio_future::block_on(join).unwrap()
     }
 }
 

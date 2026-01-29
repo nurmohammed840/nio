@@ -61,12 +61,14 @@ impl LocalContext {
         Fut: Future + 'static,
         Fut::Output: 'static,
     {
-        let (task, join) = LocalScheduler::spawn(self.worker_id, self.runtime_ctx.clone(), future);
+        let (task, join) =
+            unsafe { LocalScheduler::spawn(self.worker_id, self.runtime_ctx.clone(), future) };
+
         self.add_task_to_local_queue(task);
         join
     }
 
-    pub(crate) fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
+    pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
         F: Future + Send + 'static,
         F::Output: Send + 'static,
@@ -82,14 +84,14 @@ impl LocalContext {
         join
     }
 
-    pub(crate) fn spawn_pinned<F, Fut>(&self, future: F) -> JoinHandle<Fut::Output>
+    pub fn spawn_pinned<F, Fut>(&self, future: F) -> JoinHandle<Fut::Output>
     where
         F: FnOnce() -> Fut + Send,
         Fut: Future + 'static,
         Fut::Output: Send + 'static,
     {
         let id = self.runtime_ctx.workers.least_loaded_worker();
-        let (task, join) = LocalScheduler::spawn(id, self.runtime_ctx.clone(), future());
+        let (task, join) = unsafe { LocalScheduler::spawn(id, self.runtime_ctx.clone(), future()) };
 
         if self.worker_id == id {
             self.add_task_to_local_queue(task);
