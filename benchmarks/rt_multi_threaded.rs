@@ -111,7 +111,6 @@ fn rt_multi_spawn_many_remote_idle(c: &mut Criterion) {
     });
 }
 
-
 // The runtime is busy with tasks that consume CPU time and yield. Yielding is a
 // lower notification priority than spawning / regular notification.
 fn rt_multi_spawn_many_remote_busy1(c: &mut Criterion) {
@@ -135,7 +134,7 @@ fn rt_multi_spawn_many_remote_busy1(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(async {
                 let mut handles = Vec::with_capacity(NUM_SPAWN);
-    
+
                 for _ in 0..NUM_SPAWN {
                     handles.push(spawn(async {}));
                 }

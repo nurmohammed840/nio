@@ -132,10 +132,10 @@ impl EventLoop {
 
                 #[cfg(feature = "metrics")]
                 if _notify_flag_removed {
-                    self.ctx
+                    self.local_ctx
                         .runtime_ctx
                         .measurement
-                        .queue_drained(self.ctx.worker_id.get());
+                        .queue_drained(self.local_ctx.worker_id.get());
                 }
 
                 state

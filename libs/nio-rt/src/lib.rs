@@ -16,10 +16,9 @@ pub use nio_macros::*;
 pub use nio_task::id as task_id;
 pub use nio_task::{AbortHandle, JoinError, JoinHandle, TaskId};
 pub use rt::{
-    Runtime,
+    LocalRuntime, Runtime, WorkerId,
     context::{LocalContext, RuntimeContext},
     metrics,
-    WorkerId
 };
 pub use timer::{
     interval::{Interval, interval},
@@ -27,7 +26,7 @@ pub use timer::{
     timeout::{Timeout, timeout},
 };
 
-use crate::rt::context::{no_rt_found_panic, NioContext};
+use crate::rt::context::{NioContext, no_rt_found_panic};
 
 pub struct RuntimeBuilder {
     worker_threads: u8,

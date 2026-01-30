@@ -137,7 +137,7 @@ impl<Task: Runnable> ThreadPool<Task> {
                     Some(task) => {
                         drop(rx);
                         task.run();
-                        
+
                         let mut rx = channel.consume();
                         rx.count -= 1;
                         rx

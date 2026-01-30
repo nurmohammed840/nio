@@ -129,6 +129,15 @@ impl<M> Task<M> {
         unsafe { &mut *self.raw.as_ref().unwrap_unchecked().metadata().cast() }
     }
 
+    /// # Safety
+    ///
+    /// - If `Fut` is not [`Send`], its [`Task`] must be used and dropped on the original
+    ///   thread.
+    /// - If `Fut` is not `'static`, borrowed non-metadata variables must outlive its [`Task`].
+    /// - If `schedule` is not [`Send`] and [`Sync`], all instances of the [`Task`]'s Waker
+    ///   must be used and dropped on the original thread.
+    /// - If `schedule` is not `'static`, borrowed variables must outlive all instances of the
+    ///   [`Task`]'s Waker.
     pub unsafe fn new_unchecked<F, S>(
         meta: M,
         future: F,
