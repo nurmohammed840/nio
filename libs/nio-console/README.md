@@ -6,7 +6,7 @@ Nio Console is a terminal-based monitoring tool for Nio async runtime. It provid
 
 ```toml
 [dependencies]
-nio-console = { git = "https://github.com/nurmohammed840/nio" }
+nio-console = "0.1"
 
 # Enable optimization in the dev profile for nio-console.
 [profile.dev.package."nio-console"]

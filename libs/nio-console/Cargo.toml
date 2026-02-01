@@ -3,6 +3,7 @@ name = "nio-console"
 version = "0.1.0"
 description = "A TUI console for Nio applications."
 authors = ["Nur <nurmohammed840@gmail.com>"]
+repository = "https://github.com/nurmohammed840/nio"
 license = "Apache-2.0"
 edition = "2024"
 
@@ -10,5 +11,4 @@ edition = "2024"
 crossterm = { version = "0.28", features = ["event-stream"] }
 futures-core = "0.3"
 ratatui = "0.30"
-# nio = { path = "../nio-rt", version = "0.1" }
 nio = { path = "../nio-rt", version = "0.1" }
