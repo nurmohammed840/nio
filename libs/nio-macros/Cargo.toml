@@ -13,5 +13,5 @@ description = "procedural macros for nio"
 proc-macro = true
 
 [dependencies]
-syn = { version = "2", features = ["full"] }
+syn = { version = "3", features = ["full"] }
 quote2 = "0.9"

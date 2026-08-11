@@ -2,7 +2,7 @@
 use criterion::{
     criterion_group, criterion_main, measurement::WallTime, BenchmarkGroup, Criterion,
 };
-use rand::{Rng, RngCore, SeedableRng};
+use rand::{Rng, RngExt, SeedableRng};
 use std::{
     hint::black_box,
     sync::{
@@ -79,7 +79,7 @@ fn contention_impl<const N_TASKS: usize>(g: &mut BenchmarkGroup<WallTime>) {
     });
 }
 
-fn do_work(rng: &mut impl RngCore) -> u32 {
+fn do_work(rng: &mut impl Rng) -> u32 {
     use std::fmt::Write;
     let mut message = String::new();
     for i in 1..=10 {

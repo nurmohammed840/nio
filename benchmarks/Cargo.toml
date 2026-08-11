@@ -17,9 +17,9 @@ nio-metrics = { path = "../libs/nio-metrics" }
 nio-future = { path = "../libs/nio-future" }
 futures = "*"
 
-criterion = "0.7"
-rand = "0.9"
-rand_chacha = "0.9"
+criterion = "0.8"
+rand = "0.10"
+rand_chacha = "0.10"
 
 [dev-dependencies]
 

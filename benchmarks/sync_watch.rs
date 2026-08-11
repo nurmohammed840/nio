@@ -79,7 +79,7 @@ fn contention_resubscribe<const N_TASKS: usize>(g: &mut BenchmarkGroup<WallTime>
     });
 }
 
-fn do_work(rng: &mut impl RngCore) -> u32 {
+fn do_work(rng: &mut impl Rng) -> u32 {
     use std::fmt::Write;
     let mut message = String::new();
     for i in 1..=10 {
