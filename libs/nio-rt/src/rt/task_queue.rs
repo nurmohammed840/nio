@@ -74,7 +74,7 @@ impl TaskQueue {
     pub fn accept_notify_once_if_shared_queue_is_empty(&self) -> (bool, Counter) {
         let result = self
             .counter
-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |curr| {
+            .try_update(Ordering::AcqRel, Ordering::Acquire, |curr| {
                 let curr = Counter(curr);
                 // shared queue not empty → do nothing
                 if curr.shared() != 0 {
@@ -111,7 +111,7 @@ impl TaskQueue {
     pub fn increase_shared_and_mark_as_notified(&self) -> Counter {
         let state = self
             .counter
-            .fetch_update(Ordering::AcqRel, Ordering::Relaxed, |curr| {
+            .try_update(Ordering::AcqRel, Ordering::Relaxed, |curr| {
                 Some((curr | NOTIFIED_FLAG) + SHARED_COUNTER_ONE)
             })
             .unwrap();

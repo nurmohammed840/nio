@@ -138,7 +138,7 @@ impl App {
                     .bar_width(bar_width)
                     .bar_gap(bar_gap);
 
-                frame.render_widget(chart, chunk.clone());
+                frame.render_widget(chart, *chunk);
             }
         }
     }

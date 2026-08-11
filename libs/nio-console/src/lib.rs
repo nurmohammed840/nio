@@ -6,8 +6,6 @@ use nio::RuntimeContext;
 use crate::app::App;
 use std::io::Result;
 
-
-
 #[allow(warnings)]
 pub fn launch() {
     let last_worker = RuntimeContext::current().metrics().num_workers() - 1;
