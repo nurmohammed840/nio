@@ -92,11 +92,12 @@ impl IoWaker {
         }
 
         self.readiness.set(readiness);
+        let r = Readiness(readiness);
 
-        if readiness & Readiness::READ_MASK != 0 {
+        if r.is_readable() {
             self.reader.wake();
         }
-        if readiness & Readiness::WRITE_MASK != 0 {
+        if r.is_writable() {
             self.writer.wake();
         }
 

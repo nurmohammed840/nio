@@ -15,6 +15,11 @@ impl UdpSocket {
         UdpSocket::new(mio::net::UdpSocket::bind(addr)?)
     }
 
+    pub fn from_std(socket: std::net::UdpSocket) -> Result<Self> {
+        socket.set_nonblocking(true)?;
+        Self::new(mio::net::UdpSocket::from_std(socket))
+    }
+
     pub fn bind<A>(addr: A) -> impl Future<Output = Result<Self>>
     where
         A: ToSocketAddrs,
