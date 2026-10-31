@@ -1,8 +1,12 @@
 use crate::driver::AsyncIO;
 use crate::net::utils::bind;
-use std::io::{Error, Result};
-use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs};
-use std::{fmt, future};
+use std::{
+    fmt,
+    future::{self, PollFn},
+    io::{Error, Result},
+    net::{Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs},
+    task::{Context, Poll},
+};
 
 pub struct UdpSocket(AsyncIO<mio::net::UdpSocket>);
 
@@ -18,6 +22,26 @@ impl UdpSocket {
     pub fn from_std(socket: std::net::UdpSocket) -> Result<Self> {
         socket.set_nonblocking(true)?;
         Self::new(mio::net::UdpSocket::from_std(socket))
+    }
+
+    pub fn io_read<'a, F, T>(
+        &'a mut self,
+        f: F,
+    ) -> PollFn<impl FnMut(&mut Context) -> Poll<Result<T>> + use<'a, F, T>>
+    where
+        F: FnMut(&'a mio::net::UdpSocket) -> Result<T>,
+    {
+        self.0.io_read(f)
+    }
+
+    pub fn io_write<'a, F, T>(
+        &'a mut self,
+        f: F,
+    ) -> PollFn<impl FnMut(&mut Context) -> Poll<Result<T>> + use<'a, F, T>>
+    where
+        F: FnMut(&'a mio::net::UdpSocket) -> Result<T>,
+    {
+        self.0.io_write(f)
     }
 
     pub fn bind<A>(addr: A) -> impl Future<Output = Result<Self>>
