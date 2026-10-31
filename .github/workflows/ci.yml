@@ -13,13 +13,18 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
       with:
           toolchain: nightly
           components: miri, clippy
+
+    - name: Cache dependencies
+      uses: Swatinem/rust-cache@v2
+      with:
+        save-if: ${{ github.ref == 'refs/heads/main' }}
 
     - name: Install cargo-nextest
       uses: taiki-e/install-action@v2
