@@ -133,51 +133,6 @@ const _: fn() = || {
 };
 
 cfg_not_wasi! {
-    mod fs {
-        use super::*;
-        assert_value!(nio::fs::DirBuilder: Send & Sync & Unpin);
-        assert_value!(nio::fs::DirEntry: Send & Sync & Unpin);
-        // assert_value!(nio::fs::File: Send & Sync & Unpin);
-        // assert_value!(nio::fs::OpenOptions: Send & Sync & Unpin);
-        assert_value!(nio::fs::ReadDir: Send & Sync & Unpin);
-
-        async_assert_fn!(nio::fs::canonicalize(&str): Send & Sync & !Unpin);
-        async_assert_fn!(nio::fs::copy(&str, &str): Send & Sync & !Unpin);
-        async_assert_fn!(nio::fs::create_dir(&str): Send & Sync & !Unpin);
-        async_assert_fn!(nio::fs::create_dir_all(&str): Send & Sync & !Unpin);
-        async_assert_fn!(nio::fs::hard_link(&str, &str): Send & Sync & !Unpin);
-        async_assert_fn!(nio::fs::metadata(&str): Send & Sync & !Unpin);
-        async_assert_fn!(nio::fs::read(&str): Send & Sync & !Unpin);
-        async_assert_fn!(nio::fs::read_dir(&str): Send & Sync & !Unpin);
-        async_assert_fn!(nio::fs::read_link(&str): Send & Sync & !Unpin);
-        async_assert_fn!(nio::fs::read_to_string(&str): Send & Sync & !Unpin);
-        async_assert_fn!(nio::fs::remove_dir(&str): Send & Sync & !Unpin);
-        async_assert_fn!(nio::fs::remove_dir_all(&str): Send & Sync & !Unpin);
-        async_assert_fn!(nio::fs::remove_file(&str): Send & Sync & !Unpin);
-        async_assert_fn!(nio::fs::rename(&str, &str): Send & Sync & !Unpin);
-        async_assert_fn!(nio::fs::set_permissions(&str, std::fs::Permissions): Send & Sync & !Unpin);
-        async_assert_fn!(nio::fs::symlink_metadata(&str): Send & Sync & !Unpin);
-        async_assert_fn!(nio::fs::write(&str, Vec<u8>): Send & Sync & !Unpin);
-        async_assert_fn!(nio::fs::ReadDir::next_entry(_): Send & Sync & !Unpin);
-        // async_assert_fn!(nio::fs::OpenOptions::open(_, &str): Send & Sync & !Unpin);
-        async_assert_fn!(nio::fs::DirBuilder::create(_, &str): Send & Sync & !Unpin);
-        async_assert_fn!(nio::fs::DirEntry::metadata(_): Send & Sync & !Unpin);
-        async_assert_fn!(nio::fs::DirEntry::file_type(_): Send & Sync & !Unpin);
-        // async_assert_fn!(nio::fs::File::open(&str): Send & Sync & !Unpin);
-        // async_assert_fn!(nio::fs::File::create(&str): Send & Sync & !Unpin);
-        // async_assert_fn!(nio::fs::File::sync_all(_): Send & Sync & !Unpin);
-        // async_assert_fn!(nio::fs::File::sync_data(_): Send & Sync & !Unpin);
-        // async_assert_fn!(nio::fs::File::set_len(_, u64): Send & Sync & !Unpin);
-        // async_assert_fn!(nio::fs::File::metadata(_): Send & Sync & !Unpin);
-        // async_assert_fn!(nio::fs::File::try_clone(_): Send & Sync & !Unpin);
-        // async_assert_fn!(nio::fs::File::into_std(_): Send & Sync & !Unpin);
-        // async_assert_fn!(
-        //     nio::fs::File::set_permissions(_, std::fs::Permissions): Send & Sync & !Unpin
-        // );
-    }
-}
-
-cfg_not_wasi! {
     // assert_value!(nio::net::TcpSocket: !Send & !Sync & Unpin);
     async_assert_fn!(nio::net::TcpListener::bind(SocketAddr): !Send & !Sync & Unpin);
     async_assert_fn!(nio::net::TcpStream::connect(SocketAddr): !Send & !Sync & !Unpin);
