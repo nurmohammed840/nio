@@ -1,6 +1,6 @@
 use std::cell::Cell;
 
-use crate::local_waker::LocalWaker;
+use local_waker::LocalWaker;
 
 pub struct Readiness(u8);
 

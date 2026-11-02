@@ -37,7 +37,7 @@ impl Interval {
     }
 
     pub fn poll(&mut self, cx: &mut Context<'_>) -> Poll<()> {
-        self.delay.timer.as_ref().waker.register(cx);
+        self.delay.timer.as_ref().waker.register(cx.waker());
 
         if self.delay.is_elapsed() {
             let timer = self.delay.timer.clone();

@@ -52,7 +52,7 @@ impl Future for Sleep {
         if self.is_elapsed() {
             return Poll::Ready(());
         }
-        self.timer.as_ref().waker.register(cx);
+        self.timer.as_ref().waker.register(cx.waker());
         Poll::Pending
     }
 }

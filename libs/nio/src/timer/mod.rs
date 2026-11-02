@@ -2,7 +2,7 @@ pub mod interval;
 pub mod sleep;
 pub mod timeout;
 
-use crate::local_waker::LocalWaker;
+use local_waker::LocalWaker;
 use sleep::Sleep;
 
 use std::{

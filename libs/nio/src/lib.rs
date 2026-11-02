@@ -3,7 +3,6 @@
 pub mod net;
 
 mod driver;
-mod local_waker;
 mod rt;
 mod timer;
 mod utils;
