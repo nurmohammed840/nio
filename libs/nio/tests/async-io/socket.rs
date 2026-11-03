@@ -21,7 +21,7 @@ Aliquam consequat urna vitae ipsum pulvinar, in blandit purus eleifend.
 ";
 
 async fn tcp_streams() -> Result<(TcpStream, TcpStream)> {
-    let mut listener = TcpListener::bind("127.0.0.1:0").await?;
+    let listener = TcpListener::bind("127.0.0.1:0").await?;
     let addr = listener.local_addr()?;
 
     let server = spawn_local(async move {
@@ -50,7 +50,7 @@ async fn tcp_connect() -> Result<()> {
 
 #[test]
 async fn tcp_peek_read() -> Result<()> {
-    let (mut server, mut client) = tcp_streams().await?;
+    let (server, mut client) = tcp_streams().await?;
 
     client.write_all(LOREM_IPSUM).await?;
 
@@ -97,8 +97,8 @@ async fn tcp_writer_hangup() -> Result<()> {
 
 #[test]
 async fn udp_send_recv() -> Result<()> {
-    let mut socket1 = UdpSocket::bind("127.0.0.1:0").await?;
-    let mut socket2 = UdpSocket::bind("127.0.0.1:0").await?;
+    let socket1 = UdpSocket::bind("127.0.0.1:0").await?;
+    let socket2 = UdpSocket::bind("127.0.0.1:0").await?;
 
     socket1.connect(socket2.local_addr()?).await?;
 

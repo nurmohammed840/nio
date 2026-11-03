@@ -7,8 +7,8 @@ const MSG: &[u8] = b"hello";
 
 #[test]
 async fn send_recv() -> Result<()> {
-    let mut sender = UdpSocket::bind("127.0.0.1:0").await?;
-    let mut receiver = UdpSocket::bind("127.0.0.1:0").await?;
+    let sender = UdpSocket::bind("127.0.0.1:0").await?;
+    let receiver = UdpSocket::bind("127.0.0.1:0").await?;
 
     sender.connect(receiver.local_addr()?).await?;
     receiver.connect(sender.local_addr()?).await?;
@@ -24,8 +24,8 @@ async fn send_recv() -> Result<()> {
 
 #[test]
 async fn send_recv_poll() -> Result<()> {
-    let mut sender = UdpSocket::bind("127.0.0.1:0").await?;
-    let mut receiver = UdpSocket::bind("127.0.0.1:0").await?;
+    let sender = UdpSocket::bind("127.0.0.1:0").await?;
+    let receiver = UdpSocket::bind("127.0.0.1:0").await?;
 
     sender.connect(receiver.local_addr()?).await?;
     receiver.connect(sender.local_addr()?).await?;
@@ -41,8 +41,8 @@ async fn send_recv_poll() -> Result<()> {
 
 #[test]
 async fn send_to_recv_from() -> Result<()> {
-    let mut sender = UdpSocket::bind("127.0.0.1:0").await?;
-    let mut receiver = UdpSocket::bind("127.0.0.1:0").await?;
+    let sender = UdpSocket::bind("127.0.0.1:0").await?;
+    let receiver = UdpSocket::bind("127.0.0.1:0").await?;
 
     let receiver_addr = receiver.local_addr()?;
     sender.send_to(MSG, receiver_addr).await?;
@@ -57,8 +57,8 @@ async fn send_to_recv_from() -> Result<()> {
 
 #[test]
 async fn send_to_peek_from() -> Result<()> {
-    let mut sender = UdpSocket::bind("127.0.0.1:0").await?;
-    let mut receiver = UdpSocket::bind("127.0.0.1:0").await?;
+    let sender = UdpSocket::bind("127.0.0.1:0").await?;
+    let receiver = UdpSocket::bind("127.0.0.1:0").await?;
 
     let receiver_addr = receiver.local_addr()?;
     poll_fn(|cx| Pin::new(&mut sender.send_to(MSG, receiver_addr)).poll(cx)).await?;

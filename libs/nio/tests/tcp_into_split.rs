@@ -16,14 +16,14 @@ use nio::{
 async fn split() -> Result<()> {
     const MSG: &[u8] = b"split";
 
-    let mut listener = TcpListener::bind("127.0.0.1:0").await?;
+    let listener = TcpListener::bind("127.0.0.1:0").await?;
     let addr = listener.local_addr()?;
 
     let (stream1, stream2) = try_join! {
         TcpStream::connect(&addr),
         listener.accept(),
     }?;
-    let mut stream2 = stream2.connect().await?;
+    let stream2 = stream2.connect().await?;
 
     let (mut read_half, mut write_half) = stream1.split();
 

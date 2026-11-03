@@ -9,7 +9,7 @@ use nio::{
 
 use futures::try_join;
 
-async fn accept(mut srv: TcpListener) -> Result<TcpStream> {
+async fn accept(srv: TcpListener) -> Result<TcpStream> {
     let conn = srv.accept().await?;
     let addr = conn.peer_addr()?;
     let socket = conn.connect().await?;

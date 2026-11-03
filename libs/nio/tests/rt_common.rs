@@ -373,7 +373,7 @@ fn block_on_socket() {
         rt.block_on(|| async {
             let (tx, rx) = oneshot::channel();
 
-            let mut listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
             let addr = listener.local_addr().unwrap();
 
             spawn_local(async move {
@@ -462,7 +462,7 @@ fn io_driver_called_when_under_load() {
         }
 
         rt.block_on(|| async {
-            let mut listener = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+            let listener = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
             let addr = assert_ok!(listener.local_addr());
 
             let srv = spawn_local(async move {
@@ -489,7 +489,7 @@ fn io_driver_called_when_under_load() {
 async fn client_server(tx: std::sync::mpsc::Sender<()>) {
     use futures_lite::{AsyncReadExt, AsyncWriteExt};
 
-    let mut server = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+    let server = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
 
     // Get the assigned address
     let addr = assert_ok!(server.local_addr());

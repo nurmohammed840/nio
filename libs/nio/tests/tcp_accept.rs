@@ -24,7 +24,7 @@ macro_rules! test_accept {
         $(
             #[test]
             async fn $ident() {
-                let mut listener = assert_ok!(TcpListener::bind($target).await);
+                let listener = assert_ok!(TcpListener::bind($target).await);
                 let addr = listener.local_addr().unwrap();
 
                 let (tx, rx) = oneshot::channel();
@@ -67,7 +67,7 @@ struct TrackPolls<'a> {
 impl<'a> Stream for TrackPolls<'a> {
     type Item = io::Result<(TcpStream, SocketAddr)>;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         self.npolls.fetch_add(1, SeqCst);
 
         let conn = ready!(Pin::new(&mut self.listener.accept()).poll(cx)?);

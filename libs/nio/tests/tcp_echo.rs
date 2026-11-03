@@ -12,7 +12,7 @@ use nio::{
 async fn echo_server() -> Result<()> {
     const ITER: usize = 1024;
 
-    let mut srv = TcpListener::bind("127.0.0.1:0").await?;
+    let srv = TcpListener::bind("127.0.0.1:0").await?;
     let addr = srv.local_addr()?;
 
     let msg = "foo bar baz";

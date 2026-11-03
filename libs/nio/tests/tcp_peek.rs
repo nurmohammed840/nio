@@ -20,7 +20,7 @@ async fn peek() -> Result<()> {
 
     let _ = right.write(&[1, 2, 3, 4])?;
 
-    let mut left: TcpStream = left.try_into().unwrap();
+    let left: TcpStream = left.try_into().unwrap();
     let mut buf = [0u8; 16];
     let n = left.peek(&mut buf).await?;
     assert_eq!([1, 2, 3, 4], buf[..n]);

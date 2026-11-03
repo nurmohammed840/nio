@@ -50,10 +50,7 @@ impl TcpStream {
         self.0.io.peer_addr()
     }
 
-    pub fn peek<'b>(
-        &mut self,
-        buf: &'b mut [u8],
-    ) -> impl Future<Output = Result<usize>> + use<'_, 'b> {
+    pub fn peek<'b>(&self, buf: &'b mut [u8]) -> impl Future<Output = Result<usize>> + use<'_, 'b> {
         self.0.io_read(|io| io.peek(buf))
     }
 
@@ -81,22 +78,16 @@ impl TcpStream {
         split(self)
     }
 
-    pub fn read<'b>(
-        &mut self,
-        buf: &'b mut [u8],
-    ) -> impl Future<Output = Result<usize>> + use<'_, 'b> {
+    pub fn read<'b>(&self, buf: &'b mut [u8]) -> impl Future<Output = Result<usize>> + use<'_, 'b> {
         poll_fn(|cx| self.0.poll_read(cx, buf))
     }
 
-    pub fn write<'b>(
-        &mut self,
-        buf: &'b [u8],
-    ) -> impl Future<Output = Result<usize>> + use<'_, 'b> {
+    pub fn write<'b>(&self, buf: &'b [u8]) -> impl Future<Output = Result<usize>> + use<'_, 'b> {
         poll_fn(|cx| self.0.poll_write(cx, buf))
     }
 
     pub fn write_vectored<'b>(
-        &mut self,
+        &self,
         bufs: &'b [IoSlice],
     ) -> impl Future<Output = Result<usize>> + use<'_, 'b> {
         self.0

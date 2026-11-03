@@ -15,7 +15,7 @@ use support::futures::sync::oneshot;
 
 #[test]
 async fn shutdown() -> Result<()> {
-    let mut srv = TcpListener::bind("127.0.0.1:0").await?;
+    let srv = TcpListener::bind("127.0.0.1:0").await?;
     let addr = srv.local_addr()?;
 
     let connect = || async move {
@@ -41,7 +41,7 @@ async fn shutdown() -> Result<()> {
 
 #[test]
 async fn shutdown_multiple_calls() -> Result<()> {
-    let mut srv = TcpListener::bind("127.0.0.1:0").await?;
+    let srv = TcpListener::bind("127.0.0.1:0").await?;
     let addr = srv.local_addr()?;
 
     let (connected_tx, connected_rx) = oneshot::channel();
