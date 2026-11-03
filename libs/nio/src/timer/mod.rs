@@ -2,7 +2,7 @@ pub mod interval;
 pub mod sleep;
 pub mod timeout;
 
-use local_waker::LocalWaker;
+use crate::local_waker::LocalWakerSet;
 use sleep::Sleep;
 
 use std::{
@@ -116,7 +116,7 @@ impl Drop for RcTimer {
 struct Timer {
     rc: Cell<u8>,
     deadline: Cell<Instant>,
-    waker: LocalWaker,
+    waker: LocalWakerSet,
 }
 
 impl Timer {
@@ -124,7 +124,7 @@ impl Timer {
         Self {
             rc: Cell::new(2),
             deadline: Cell::new(deadline),
-            waker: LocalWaker::new(),
+            waker: LocalWakerSet::new(),
         }
     }
 }

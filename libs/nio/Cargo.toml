@@ -19,7 +19,6 @@ nio-metrics = { path = "../nio-metrics", version = "0.0.0" }
 mio = { version = "1", features = ["os-poll", "net"] }
 crossbeam-queue = "0.3"
 crossbeam-utils = "0.8"
-local-waker = "0.1.5"
 
 futures-io = { version = "0.3", optional = true }
 tokio = { version = "1", default-features = false, optional = true }

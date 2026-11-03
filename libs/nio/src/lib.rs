@@ -5,6 +5,7 @@ pub mod net;
 mod driver;
 mod rt;
 mod timer;
+mod local_waker;
 mod utils;
 
 use std::num::NonZero;

@@ -1,6 +1,6 @@
 use std::cell::Cell;
 
-use local_waker::LocalWaker;
+use crate::local_waker::LocalWakerSet;
 
 pub struct Readiness(u8);
 
@@ -27,8 +27,8 @@ impl Readiness {
 #[derive(Default, Debug)]
 pub struct IoWaker {
     readiness: Cell<u8>,
-    pub reader: LocalWaker,
-    pub writer: LocalWaker,
+    pub reader: LocalWakerSet,
+    pub writer: LocalWakerSet,
 }
 
 impl IoWaker {

@@ -37,7 +37,7 @@ impl<Io: Source> AsyncIO<Io> {
         F: FnMut(&'a Io) -> Result<T>,
     {
         poll_fn(move |cx| {
-            self.waker.reader.register(cx.waker());
+            self.waker.reader.register(cx);
 
             let readiness = self.waker.readiness();
             if readiness.is_readable() {
@@ -60,7 +60,7 @@ impl<Io: Source> AsyncIO<Io> {
         F: FnMut(&'a Io) -> Result<T>,
     {
         poll_fn(move |cx| {
-            self.waker.writer.register(cx.waker());
+            self.waker.writer.register(cx);
 
             let readiness = self.waker.readiness();
             if readiness.is_writable() {
@@ -77,7 +77,7 @@ impl<Io: Source> AsyncIO<Io> {
 
     pub fn io_writable(&self) -> PollFn<impl FnMut(&mut Context) -> Poll<()> + use<'_, Io>> {
         poll_fn(move |cx| {
-            self.waker.writer.register(cx.waker());
+            self.waker.writer.register(cx);
             if self.waker.readiness().is_writable() {
                 return Poll::Ready(());
             }
@@ -91,7 +91,7 @@ impl<Io: Source> AsyncIO<Io> {
     where
         &'a Io: Read,
     {
-        self.waker.reader.register(cx.waker());
+        self.waker.reader.register(cx);
 
         let readiness = self.waker.readiness();
         if readiness.is_readable() {
@@ -123,7 +123,7 @@ impl<Io: Source> AsyncIO<Io> {
     where
         &'a Io: Write,
     {
-        self.waker.writer.register(cx.waker());
+        self.waker.writer.register(cx);
 
         let readiness = self.waker.readiness();
         if readiness.is_writable() {
