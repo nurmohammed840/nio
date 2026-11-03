@@ -25,7 +25,7 @@ async fn split() -> Result<()> {
     }?;
     let stream2 = stream2.connect().await?;
 
-    let (mut read_half, mut write_half) = stream1.split();
+    let (read_half, write_half) = stream1.split();
 
     try_join! {
         async {
@@ -112,7 +112,7 @@ async fn drop_write() -> Result<()> {
     });
 
     let stream = TcpStream::connect(&addr).await?;
-    let (mut read_half, write_half) = stream.split();
+    let (read_half, write_half) = stream.split();
 
     let mut read_buf = [0u8; 32];
     let read_len = read_half.read(&mut read_buf[..]).await?;

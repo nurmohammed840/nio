@@ -125,7 +125,7 @@ async fn udp_send_recv() -> Result<()> {
 async fn tcp_duplex() -> Result<()> {
     let (server, client) = tcp_streams().await?;
 
-    async fn do_read(mut s: TcpReader) -> io::Result<()> {
+    async fn do_read(s: TcpReader) -> io::Result<()> {
         let mut buf = vec![0u8; 4096];
         loop {
             let len = s.read(&mut buf).await?;
