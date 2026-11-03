@@ -25,7 +25,7 @@ impl UdpSocket {
     }
 
     pub fn io_read<'a, F, T>(
-        &'a mut self,
+        &'a self,
         f: F,
     ) -> PollFn<impl FnMut(&mut Context) -> Poll<Result<T>> + use<'a, F, T>>
     where
@@ -35,7 +35,7 @@ impl UdpSocket {
     }
 
     pub fn io_write<'a, F, T>(
-        &'a mut self,
+        &'a self,
         f: F,
     ) -> PollFn<impl FnMut(&mut Context) -> Poll<Result<T>> + use<'a, F, T>>
     where
@@ -58,19 +58,16 @@ impl UdpSocket {
         future::ready(bind(addr, |addr| self.0.io.connect(addr)))
     }
 
-    pub fn send<'b>(&mut self, buf: &'b [u8]) -> impl Future<Output = Result<usize>> + use<'_, 'b> {
+    pub fn send<'b>(&self, buf: &'b [u8]) -> impl Future<Output = Result<usize>> + use<'_, 'b> {
         self.0.io_write(|io| io.send(buf))
     }
 
-    pub fn recv<'b>(
-        &mut self,
-        buf: &'b mut [u8],
-    ) -> impl Future<Output = Result<usize>> + use<'_, 'b> {
+    pub fn recv<'b>(&self, buf: &'b mut [u8]) -> impl Future<Output = Result<usize>> + use<'_, 'b> {
         self.0.io_read(|io| io.recv(buf))
     }
 
     pub fn send_to<'b>(
-        &mut self,
+        &self,
         buf: &'b [u8],
         target: SocketAddr,
     ) -> impl Future<Output = Result<usize>> + use<'_, 'b> {
@@ -78,23 +75,20 @@ impl UdpSocket {
     }
 
     pub fn recv_from<'b>(
-        &mut self,
+        &self,
         buf: &'b mut [u8],
     ) -> impl Future<Output = Result<(usize, SocketAddr)>> + use<'_, 'b> {
         self.0.io_read(|io| io.recv_from(buf))
     }
 
     pub fn peek_from<'b>(
-        &mut self,
+        &self,
         buf: &'b mut [u8],
     ) -> impl Future<Output = Result<(usize, SocketAddr)>> + use<'_, 'b> {
         self.0.io_read(|io| io.peek_from(buf))
     }
 
-    pub fn peek<'b>(
-        &mut self,
-        buf: &'b mut [u8],
-    ) -> impl Future<Output = Result<usize>> + use<'_, 'b> {
+    pub fn peek<'b>(&self, buf: &'b mut [u8]) -> impl Future<Output = Result<usize>> + use<'_, 'b> {
         self.0.io_read(|io| io.peek(buf))
     }
 
