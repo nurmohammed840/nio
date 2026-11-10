@@ -1,21 +1,28 @@
 use mpmc_channel::MPMC;
-use std::{collections::VecDeque, io, num::NonZero, sync::Arc, thread, time::Duration};
+use std::{
+    collections::VecDeque,
+    io,
+    num::NonZero,
+    panic::{self, AssertUnwindSafe},
+    sync::Arc,
+    thread,
+    time::Duration,
+};
 
 type Channel<Task> = Arc<MPMC<Queue<Task>>>;
 
 struct Queue<Task> {
     tasks: VecDeque<Task>,
     count: usize,
+    workers: usize,
 }
 
 pub struct ThreadPool<Task: Runnable> {
     channel: Channel<Task>,
 
     // ----- config -----
-    max_threads_limit: u16,
     timeout: Option<Duration>,
     stack_size: Option<NonZero<usize>>,
-    load_factor: usize,
     name: Box<dyn Fn(usize) -> String + Send + Sync>,
 }
 
@@ -25,11 +32,10 @@ impl<T: Runnable> Default for ThreadPool<T> {
             channel: Arc::new(MPMC::new(Queue {
                 tasks: VecDeque::with_capacity(64),
                 count: 0,
+                workers: 0,
             })),
 
             timeout: Some(Duration::from_secs(7)),
-            max_threads_limit: 32,
-            load_factor: 2,
             stack_size: None,
             name: Box::new(|id| format!("Worker: {id}")),
         }
@@ -50,20 +56,8 @@ impl<Task: Runnable> ThreadPool<Task> {
         self
     }
 
-    pub fn max_threads_limit(mut self, limit: u16) -> Self {
-        assert!(limit > 0, "max threads limit must be greater than 0");
-        self.max_threads_limit = limit;
-        self
-    }
-
     pub fn stack_size(mut self, stack_size: usize) -> Self {
         self.stack_size = NonZero::new(stack_size);
-        self
-    }
-
-    pub fn load_factor(mut self, factor: usize) -> Self {
-        assert!(factor != 0, "threadpool load factor must be > 0");
-        self.load_factor = factor;
         self
     }
 
@@ -85,48 +79,54 @@ impl<Task: Runnable> ThreadPool<Task> {
         self.stack_size.map(|size| size.get())
     }
 
-    pub fn get_max_threads_limit(&self) -> u16 {
-        self.max_threads_limit
-    }
-
     // -------------------------------------------
 
     pub fn thread_count(&self) -> usize {
-        Arc::strong_count(&self.channel) - 1
-    }
-
-    pub fn is_thread_limit_reached(&self) -> bool {
-        self.thread_count() > self.get_max_threads_limit().into()
-    }
-
-    pub fn add_task_to_queue(&self, task: Task) -> usize {
-        let mut tx = self.channel.produce();
-        tx.tasks.push_back(task);
-        tx.count += 1;
-        let task_count = tx.count;
-        tx.notify_one();
-        task_count
+        self.channel.consume().workers
     }
 
     pub fn execute(&self, task: Task) {
-        let task_count = self.add_task_to_queue(task);
+        let spawn_needed = {
+            let mut q = self.channel.produce();
+            q.tasks.push_back(task);
+            q.count += 1;
 
-        let thread_count = self.thread_count();
-        if thread_count > self.get_max_threads_limit().into() {
-            return;
+            let all_busy = q.count > q.workers;
+            if all_busy {
+                q.workers += 1;
+            }
+
+            q.notify_one();
+            all_busy
+        };
+
+        if spawn_needed {
+            if let Err(err) = self.spawn_reserved(self.thread_builder()) {
+                let stranded = {
+                    let mut q = self.channel.produce();
+                    q.workers -= 1;
+                    q.workers == 0
+                };
+                // Panic only after the lock is released, or the mutex gets poisoned.
+                // Skip it if other workers exist: they will run the task.
+                if stranded {
+                    panic!("failed to spawn a thread in thread pool: {err}");
+                }
+            }
         }
-
-        let threshold = thread_count * self.load_factor;
-        if task_count <= threshold {
-            return;
-        }
-
-        let b = self.thread_builder();
-        self.spawn(b)
-            .expect("failed to spawn a thread in thread pool");
     }
 
-    pub fn spawn(&self, thread_builder: thread::Builder) -> io::Result<thread::JoinHandle<()>> {
+    pub fn spawn(&self, builder: thread::Builder) -> io::Result<thread::JoinHandle<()>> {
+        self.channel.produce().workers += 1;
+        self.spawn_reserved(builder).inspect_err(|_| {
+            self.channel.produce().workers -= 1;
+        })
+    }
+
+    fn spawn_reserved(
+        &self,
+        thread_builder: thread::Builder,
+    ) -> io::Result<thread::JoinHandle<()>> {
         let timeout = self.timeout;
         let channel = self.channel.clone();
 
@@ -136,9 +136,9 @@ impl<Task: Runnable> ThreadPool<Task> {
                 rx = match rx.tasks.pop_front() {
                     Some(task) => {
                         drop(rx);
-                        task.run();
+                        let _ = panic::catch_unwind(AssertUnwindSafe(|| task.run()));
 
-                        let mut rx = channel.consume();
+                        rx = channel.consume();
                         rx.count -= 1;
                         rx
                     }
@@ -146,12 +146,20 @@ impl<Task: Runnable> ThreadPool<Task> {
                         None => rx.wait(),
                         Some(dur) => match rx.wait_timeout(dur) {
                             Ok(rx) => rx,
-                            Err(_) => break,
+                            Err(_) => {
+                                rx = channel.consume();
+                                if rx.tasks.is_empty() {
+                                    rx.workers -= 1;
+                                    break;
+                                }
+                                rx
+                            }
                         },
                     },
                 }
             }
         };
+
         thread_builder.spawn(worker)
     }
 

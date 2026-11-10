@@ -34,8 +34,6 @@ impl RuntimeBuilder {
                 metrics
             },
             threadpool: ThreadPool::new()
-                .max_threads_limit(self.max_blocking_threads)
-                .load_factor(self.threadpool_load_factor)
                 .stack_size(self.thread_stack_size)
                 .timeout(self.thread_timeout)
                 .name(self.thread_name.take().unwrap()),
@@ -73,8 +71,6 @@ impl RuntimeBuilder {
                 metrics
             },
             threadpool: ThreadPool::new()
-                .max_threads_limit(self.max_blocking_threads)
-                .load_factor(self.threadpool_load_factor)
                 .stack_size(self.thread_stack_size)
                 .timeout(self.thread_timeout)
                 .name(self.thread_name.take().unwrap()),

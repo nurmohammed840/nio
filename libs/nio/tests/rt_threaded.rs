@@ -154,7 +154,6 @@ fn blocking() {
     let (tx, rx) = mpsc::channel();
 
     let rt = RuntimeBuilder::new()
-        .threadpool_load_factor(1)
         .rt()
         .unwrap();
 

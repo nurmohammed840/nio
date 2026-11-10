@@ -31,7 +31,6 @@ impl Runtime {
         Self(
             nio::RuntimeBuilder::new()
                 .measurement(SimpleMeasurement::new())
-                .max_blocking_threads(512)
                 .rt()
                 .unwrap(),
         )

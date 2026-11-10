@@ -3,9 +3,9 @@
 pub mod net;
 
 mod driver;
+mod local_waker;
 mod rt;
 mod timer;
-mod local_waker;
 mod utils;
 
 use std::num::NonZero;
@@ -35,8 +35,6 @@ pub struct RuntimeBuilder {
     event_interval: u32,
     min_tasks_per_worker: Option<NonZero<u64>>,
 
-    threadpool_load_factor: usize,
-    max_blocking_threads: u16,
     thread_stack_size: usize,
     thread_timeout: Option<Duration>,
     thread_name: Option<Box<dyn Fn(usize) -> String + Send + Sync>>,
@@ -60,8 +58,6 @@ impl Default for RuntimeBuilder {
             event_interval: 61,
             min_tasks_per_worker: None,
 
-            threadpool_load_factor: 2,
-            max_blocking_threads: 512,
             thread_stack_size: 0,
             thread_timeout: Some(Duration::from_secs(10)),
             thread_name: Some(Box::new(|id| format!("Thread: {id}"))),
@@ -111,16 +107,6 @@ impl RuntimeBuilder {
 
     pub fn thread_stack_size(mut self, size: usize) -> Self {
         self.thread_stack_size = size;
-        self
-    }
-
-    pub fn threadpool_load_factor(mut self, factor: usize) -> Self {
-        self.threadpool_load_factor = factor;
-        self
-    }
-
-    pub fn max_blocking_threads(mut self, val: u16) -> Self {
-        self.max_blocking_threads = val;
         self
     }
 

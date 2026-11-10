@@ -1169,7 +1169,7 @@ version = "0.0.0"
 
 [[package]]
 name = "nio"
-version = "0.2.0-rc.1"
+version = "0.2.0-rc.2"
 dependencies = [
  "crossbeam-queue",
  "crossbeam-utils",
@@ -1227,7 +1227,7 @@ dependencies = [
 
 [[package]]
 name = "nio-threadpool"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "mpmc-channel",
 ]
