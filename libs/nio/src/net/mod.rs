@@ -17,21 +17,21 @@ use std::{
 };
 
 macro_rules! impl_async_read {
-    [$($name:ty),*] => [$(
+    (@impl $name:ident, $ty:ty) => {
         #[cfg(feature = "futures-io")]
-        impl futures_io::AsyncRead for $name {
+        impl futures_io::AsyncRead for $ty {
             #[inline]
             fn poll_read(
                 self: Pin<&mut Self>,
                 cx: &mut Context<'_>,
                 buf: &mut [u8],
             ) -> Poll<Result<usize>> {
-                Self::poll_read(&self, cx, buf)
+                $name::poll_read(&self, cx, buf)
             }
         }
 
         #[cfg(feature = "tokio-io")]
-        impl tokio::io::AsyncRead for $name {
+        impl tokio::io::AsyncRead for $ty {
             fn poll_read(
                 self: Pin<&mut Self>,
                 cx: &mut Context,
@@ -39,24 +39,28 @@ macro_rules! impl_async_read {
             ) -> Poll<Result<()>> {
                 unsafe {
                     let b = &mut *(buf.unfilled_mut() as *mut _ as *mut [u8]);
-                    let n = std::task::ready!(Self::poll_read(&self, cx, b))?;
+                    let n = std::task::ready!($name::poll_read(&self, cx, b))?;
                     buf.assume_init(n);
                     buf.advance(n);
                     Poll::Ready(Ok(()))
                 }
             }
         }
+    };
 
-    )*]
+    [$($name:ident),*] => [$(
+        impl_async_read!(@impl $name, $name);
+        impl_async_read!(@impl $name, &$name);
+    )*];
 }
 
 macro_rules! impl_async_write {
-    [$($name:ty),*] => [$(
+    (@impl $name:ident, $ty:ty) => {
         #[cfg(feature = "futures-io")]
-        impl futures_io::AsyncWrite for $name {
+        impl futures_io::AsyncWrite for $ty {
             #[inline]
             fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize>> {
-                Self::poll_write(&self, cx, buf)
+                $name::poll_write(&self, cx, buf)
             }
 
             #[inline]
@@ -65,7 +69,7 @@ macro_rules! impl_async_write {
                 cx: &mut Context,
                 bufs: &[IoSlice],
             ) -> Poll<Result<usize>> {
-                Self::poll_write_vectored(&self, cx, bufs)
+                $name::poll_write_vectored(&self, cx, bufs)
             }
 
             #[inline]
@@ -81,10 +85,10 @@ macro_rules! impl_async_write {
         }
 
         #[cfg(feature = "tokio-io")]
-        impl tokio::io::AsyncWrite for $name {
+        impl tokio::io::AsyncWrite for $ty {
             #[inline]
             fn poll_write(self: Pin<&mut Self>, cx: &mut Context, buf: &[u8]) -> Poll<Result<usize>> {
-                Self::poll_write(&self, cx, buf)
+                $name::poll_write(&self, cx, buf)
             }
 
             #[inline]
@@ -93,7 +97,7 @@ macro_rules! impl_async_write {
                 cx: &mut Context,
                 bufs: &[IoSlice],
             ) -> Poll<Result<usize>> {
-                Self::poll_write_vectored(&self, cx, bufs)
+                $name::poll_write_vectored(&self, cx, bufs)
             }
 
             #[inline]
@@ -112,8 +116,12 @@ macro_rules! impl_async_write {
                 Poll::Ready(Ok(()))
             }
         }
+    };
 
-    )*]
+    [$($name:ident),*] => [$(
+        impl_async_write!(@impl $name, $name);
+        impl_async_write!(@impl $name, &$name);
+    )*];
 }
 
 impl_async_read! {
